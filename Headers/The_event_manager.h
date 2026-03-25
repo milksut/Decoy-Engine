@@ -124,6 +124,7 @@ private:
                 const Event_type type = event->type;
 
                 std::vector<Event_receiver_weak>& vec = subscribers[type];
+
                 vec.erase(std::remove_if(vec.begin(), vec.end(),
                     [](const Event_receiver_weak& w){ return w.expired(); }),
                     vec.end());

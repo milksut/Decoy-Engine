@@ -10,6 +10,16 @@
 #define OPENGL_VERSION_MINOR 3
 //end of defines---------------------------------------------------------------------------------
 
+//Enums -----------------------------------------------------------------------------------------
+enum Key_state
+{
+	Idle,    //While the key is free
+	Pressed,// When the key is first pressed
+	Hold,   // While the key is hold
+	Released// When the key is first released
+};
+//end of enums-----------------------------------------------------------------------------------
+
 
 
 //Includes----------------------------------------------------------------------------------------
@@ -73,6 +83,30 @@
 	};
 
 	//end of TEX_TYPE MACRO-----------------------------------------------------------------------
+
+	//Basic_input_channels MACRO ------------------------------------------------------------------
+	#define Basic_input_channels\
+		X(Keyboard_input) \
+		X(Mouse_input) \
+		X(Combo_input)
+
+	enum Input_channel
+	{
+		#define X(name) name,
+		Basic_input_channels
+		#undef X
+
+		Input_channel_amount//always leave in bottom. Used to measure how many input channels are there
+	};
+
+	static const std::string Input_channel_names[] =
+	{
+		#define X(name) #name,
+		Basic_input_channels
+		#undef X
+	};
+
+	//end of Basic_input_channels MACRO -----------------------------------------------------------
 //end of X-Macros---------------------------------------------------------------------------------
 
 
@@ -135,6 +169,23 @@ struct material_properties
 	float opacity;
 	float index_of_refraction; //how much light bends when entering the material
 	int illumination_model; //illumination model used by the material
+};
+
+struct Input_key
+{
+	Input_channel type;
+	int code;
+
+	bool operator==(const Input_key& other) const
+	{
+		return type == other.type && code == other.code;
+	}
+};
+
+//For events to fire when more than 1 key is pressed, we need to check each combo
+struct Key_combo
+{
+	std::vector<Input_key> keys;
 };
 //end of structs---------------------------------------------------------------------------------
 
@@ -303,8 +354,12 @@ namespace Event_management
 	enum Event_type
 	{
 		Null,
-		Mouse_moved, Mouse_pressed, Mouse_released,
-		Key_pressed, Key_hold, Key_released,
+		Mouse_moved, Mouse_scrolled,
+		Mouse_button_pressed, Mouse_button_hold, Mouse_button_released,
+		Keyboard_button_pressed, Keyboard_button_hold, Keyboard_button_released,
+		Combo_button_pressed, Combo_button_hold, Combo_button_released,
+
+		LAST_EVENT_TYPE//always leave in bottom. Used to measure how many event types there are
 	};
 
 	enum class Event_timing { Immediate, Queued };
@@ -377,9 +432,10 @@ namespace Logger
 		FATAL
 	};
 
-	class Logger_class {
+	class Logger_class
+	{
 	public:
-		LogLevel console_log_level = LogLevel::DEBUG;
+		LogLevel console_log_level = LogLevel::INFO;
 		void log(LogLevel level, const char* file, int line, const char* format, ...) {
 			char buffer[1024];
 			va_list args;

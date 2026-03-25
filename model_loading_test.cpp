@@ -240,7 +240,7 @@ int main()
 	Logger::checkGLError("After loading light");
 
 	//-------------------------------------------------------------------------------------------------------------
-	input_manager = new Input_Manager(manager,window,width,height);
+	input_manager = new Input_Manager(manager,window);
 
 	// subscriber that prints mouse movement
 	Event_receiver_shared mouse_receiver = make_receiver([](const Event& e)
@@ -253,7 +253,7 @@ int main()
 		}
 	});
 
-	//input_manager->event_manager.subscribe("Mouse_input", Event_type::Mouse_moved, mouse_receiver);
+	input_manager->subscribe(Mouse_input, Event_type::Mouse_moved, mouse_receiver);
 
 	Event_receiver_shared camera_trigger = make_receiver([](const Event& e)
 	{
@@ -266,7 +266,87 @@ int main()
 		}
 	});
 
-	input_manager->event_manager.subscribe("Mouse_input", Event_type::Mouse_moved, camera_trigger);
+	input_manager->subscribe(Mouse_input, Event_type::Mouse_moved, camera_trigger);
+
+	/*/? TEST CODE------------------------------------------------------------------------------------------------------
+
+	// Test all keyboard events
+	Event_receiver_shared kb_receiver = make_receiver([](const Event& e)
+		{
+			if (e.type == Event_type::Keyboard_button_pressed)
+			{
+				const auto& ke = dynamic_cast<const Key_press_event&>(e);
+				LOG_INFO("Key PRESSED: %d", ke.key.code);
+			}
+			else if (e.type == Event_type::Keyboard_button_hold)
+			{
+				const auto& ke = dynamic_cast<const Key_hold_event&>(e);
+				LOG_INFO("Key HELD: %d", ke.key.code);
+			}
+			else if (e.type == Event_type::Keyboard_button_released)
+			{
+				const auto& ke = dynamic_cast<const Key_release_event&>(e);
+				LOG_INFO("Key RELEASED: %d", ke.key.code);
+			}
+		});
+	input_manager->subscribe(Keyboard_input, Event_type::Keyboard_button_pressed, kb_receiver);
+	input_manager->subscribe(Keyboard_input, Event_type::Keyboard_button_hold, kb_receiver);
+	input_manager->subscribe(Keyboard_input, Event_type::Keyboard_button_released, kb_receiver);
+
+	// Test mouse buttons
+	Event_receiver_shared mb_receiver = make_receiver([](const Event& e)
+		{
+			if (e.type == Event_type::Mouse_button_pressed)
+			{
+				const auto& me = dynamic_cast<const Mouse_button_press_event&>(e);
+				LOG_INFO("Mouse PRESSED: %d", me.key.code);
+			}
+			else if (e.type == Event_type::Mouse_button_released)
+			{
+				const auto& me = dynamic_cast<const Mouse_button_release_event&>(e);
+				LOG_INFO("Mouse RELEASED: %d", me.key.code);
+			}
+			else if (e.type == Event_type::Mouse_button_hold)
+			{
+				const auto& me = dynamic_cast<const Mouse_button_hold_event&>(e);
+				LOG_INFO("Mouse HELD: %d", me.key.code);
+			}
+		});
+	input_manager->subscribe(Mouse_input, Event_type::Mouse_button_pressed, mb_receiver);
+	input_manager->subscribe(Mouse_input, Event_type::Mouse_button_released, mb_receiver);
+	input_manager->subscribe(Mouse_input, Event_type::Mouse_button_hold, mb_receiver);
+
+	// Test scroll
+	Event_receiver_shared scroll_receiver = make_receiver([](const Event& e)
+		{
+			if (e.type == Event_type::Mouse_scrolled)
+			{
+				const auto& se = dynamic_cast<const Mouse_scroll_event&>(e);
+				LOG_INFO("Scroll: %f, %f", se.x_offset, se.y_offset);
+			}
+		});
+	input_manager->subscribe(Mouse_input, Event_type::Mouse_scrolled, scroll_receiver);
+
+	// Test a combo — G + M
+	input_manager->register_combo({
+		Input_key{ Input_channel::Keyboard_input, GLFW_KEY_G },
+		Input_key{ Input_channel::Keyboard_input, GLFW_KEY_M }
+		});
+	Event_receiver_shared combo_receiver = make_receiver([](const Event& e)
+		{
+			if (e.type == Event_type::Combo_button_pressed)
+				LOG_INFO("Combo_button PRESSED");
+			else if (e.type == Event_type::Combo_button_released)
+				LOG_INFO("Combo_button RELEASED");
+			else if (e.type == Event_type::Combo_button_hold)
+				LOG_INFO("Combo_button HELD");
+		});
+	input_manager->subscribe(Combo_input, Event_type::Combo_button_pressed, combo_receiver);
+	input_manager->subscribe(Combo_input, Event_type::Combo_button_released, combo_receiver);
+	input_manager->subscribe(Combo_input, Event_type::Combo_button_hold, combo_receiver);
+
+	//? END OF TEST CODE-----------------------------------------------------------------------------------------------*/
+
 	//-------------------------------------------------------------------------------------------------------------
 
 	glEnable(GL_DEPTH_TEST); // Enable depth testing for 3D rendering
@@ -308,6 +388,7 @@ int main()
 		Logger::checkGLError("After drawing fps");
 
 		glfwSwapBuffers(window);
+		input_manager->Poll_keys();
 		glfwPollEvents();
 	}
 	delete printer;

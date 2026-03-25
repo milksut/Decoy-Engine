@@ -8,32 +8,38 @@
 class Key_press_event: public Event_management::Event
 {
     public:
-    int key_code;
-    Key_press_event(const int key_code)
-        : Event(Event_management::Event_timing::Immediate, Event_management::Event_type::Key_pressed), key_code(key_code)
-    {}
+    Input_key key;
+
+    Key_press_event(const Input_key key)
+        : Event(Event_management::Event_timing::Immediate, Event_management::Event_type::Keyboard_button_pressed), key(key)
+    {
+    }
 
     void execute() override {}
 };
 
-class Key_hold_event: public Event_management::Event
+class Key_hold_event : public Event_management::Event
 {
 public:
-    int key_code;
-    Key_hold_event(const int key_code)
-        : Event(Event_management::Event_timing::Immediate, Event_management::Event_type::Key_hold), key_code(key_code)
-    {}
+    Input_key key;
+
+    Key_hold_event(const Input_key key)
+        : Event(Event_management::Event_timing::Immediate, Event_management::Event_type::Keyboard_button_hold), key(key)
+    {
+    }
 
     void execute() override {}
 };
 
-class Key_release_event: public Event_management::Event
+class Key_release_event : public Event_management::Event
 {
 public:
-    int key_code;
-    Key_release_event(const int key_code)
-        : Event(Event_management::Event_timing::Immediate, Event_management::Event_type::Key_released), key_code(key_code)
-    {}
+    Input_key key;
+
+    Key_release_event(const Input_key key)
+        : Event(Event_management::Event_timing::Immediate, Event_management::Event_type::Keyboard_button_released), key(key)
+    {
+    }
 
     void execute() override {}
 };
