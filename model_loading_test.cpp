@@ -140,6 +140,7 @@ void processInput(GLFWwindow* window, float camera_speed, camera_test& camera)
 
 int main()
 {
+	glfwInit();
 	GLFWwindow* window = init_window(width, height, "Shader Tester");
 	glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
 
@@ -242,18 +243,7 @@ int main()
 	//-------------------------------------------------------------------------------------------------------------
 	input_manager = new Input_Manager(manager,window);
 
-	// subscriber that prints mouse movement
-	Event_receiver_shared mouse_receiver = make_receiver([](const Event& e)
-	{
-		if (e.type == Event_type::Mouse_moved)
-		{
-			const auto& mouse = dynamic_cast<const Mouse_move_event&>(e);
-			LOG_INFO("Mouse moved: %f, %f", mouse.mouse_x_offset, mouse.mouse_y_offset);
-			const_cast<Mouse_move_event&>(mouse).is_alive = false; // consume it
-		}
-	});
-
-	input_manager->subscribe(Mouse_input, Event_type::Mouse_moved, mouse_receiver);
+	
 
 	Event_receiver_shared camera_trigger = make_receiver([](const Event& e)
 	{
@@ -269,7 +259,18 @@ int main()
 	input_manager->subscribe(Mouse_input, Event_type::Mouse_moved, camera_trigger);
 
 	/*/? TEST CODE------------------------------------------------------------------------------------------------------
+	// subscriber that prints mouse movement
+	Event_receiver_shared mouse_receiver = make_receiver([](const Event& e)
+	{
+		if (e.type == Event_type::Mouse_moved)
+		{
+			const auto& mouse = dynamic_cast<const Mouse_move_event&>(e);
+			LOG_INFO("Mouse moved: %f, %f", mouse.mouse_x_offset, mouse.mouse_y_offset);
+			const_cast<Mouse_move_event&>(mouse).is_alive = false; // consume it
+		}
+	});
 
+	input_manager->subscribe(Mouse_input, Event_type::Mouse_moved, mouse_receiver);
 	// Test all keyboard events
 	Event_receiver_shared kb_receiver = make_receiver([](const Event& e)
 		{
@@ -367,7 +368,7 @@ int main()
 
 		shader.use();
 		shader.setVec3("viewPos", camera.camera_position);
-		shader.setMatrix4fv("view", glm::value_ptr(camera.get_view_matrix()));
+		shader.setMatrix4fv("view", glm::value_ptr(camera.view));
 		shader.setMatrix4fv("projection", glm::value_ptr(camera.projection));
 
 
@@ -383,6 +384,7 @@ int main()
 			fps_text = "FPS: " + std::to_string(y);
 			LOG_INFO("FPS: %d Draw calls per second: %d", y, draw_call_count);
 			draw_call_count = 0;
+			printer->render_text(fps_text, -1, 0.9, 2.0f);
 		}
 		printer->render_text(fps_text, -1, 0.9, 2.0f);
 		Logger::checkGLError("After drawing fps");

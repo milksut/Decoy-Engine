@@ -14,6 +14,9 @@ using namespace Shader_variables;
 
 class Shader
 {
+private:
+    std::unordered_map<std::string, int> uniform_locations;
+
 public:
     unsigned int ID;
     // constructor generates the shader on the fly
@@ -127,62 +130,106 @@ public:
         if (current_shader_id != ID)
             use();
 
-        glUniform1i(glGetUniformLocation(ID, name.c_str()), (int)value);
+		if(uniform_locations.find(name) == uniform_locations.end())
+        {
+            uniform_locations[name] = glGetUniformLocation(ID, name.c_str());
+        }
+        glUniform1i(uniform_locations[name], (int)value);
     }
     // ------------------------------------------------------------------------
     void setInt(const std::string& name, int value) 
     {
         if (current_shader_id != ID)
             use();
-        glUniform1i(glGetUniformLocation(ID, name.c_str()), value);
+
+        if (uniform_locations.find(name) == uniform_locations.end())
+        {
+            uniform_locations[name] = glGetUniformLocation(ID, name.c_str());
+        }
+        glUniform1i(uniform_locations[name], value);
     }
     // ------------------------------------------------------------------------
     void setInt(const std::string& name, int value[], int amount)
     {
         if (current_shader_id != ID)
             use();
-        glUniform1iv(glGetUniformLocation(ID, name.c_str()), amount, value);
+
+        if (uniform_locations.find(name) == uniform_locations.end())
+        {
+            uniform_locations[name] = glGetUniformLocation(ID, name.c_str());
+        }
+        glUniform1iv(uniform_locations[name], amount, value);
     }
     // ------------------------------------------------------------------------
-    void setFloat(const std::string& name, float value) 
+    void setFloat(const std::string& name, float value)
     {
         if (current_shader_id != ID)
             use();
-        glUniform1f(glGetUniformLocation(ID, name.c_str()), value);
+
+        if (uniform_locations.find(name) == uniform_locations.end())
+        {
+            uniform_locations[name] = glGetUniformLocation(ID, name.c_str());
+        }
+        glUniform1f(uniform_locations[name], value);
     }
     // ------------------------------------------------------------------------
     void setFloat(const std::string& name, float value[], int amount)
     {
         if (current_shader_id != ID)
             use();
-        glUniform1fv(glGetUniformLocation(ID, name.c_str()), amount, value);
+
+        if (uniform_locations.find(name) == uniform_locations.end())
+        {
+            uniform_locations[name] = glGetUniformLocation(ID, name.c_str());
+        }
+        glUniform1fv(uniform_locations[name], amount, value);
     }
     // ------------------------------------------------------------------------
-    void setMatrix4fv(const std::string& name, const float* value) 
+    void setMatrix4fv(const std::string& name, const float* value)
     {
         if (current_shader_id != ID)
             use();
-        glUniformMatrix4fv(glGetUniformLocation(ID, name.c_str()), 1, GL_FALSE, value);
-	}
-    // ------------------------------------------------------------------------
-    void setVec4(const std::string& name, const glm::vec4& value) 
-    {
-        if (current_shader_id != ID)
-            use();
-        glUniform4fv(glGetUniformLocation(ID, name.c_str()), 1, glm::value_ptr(value));
+
+        if (uniform_locations.find(name) == uniform_locations.end())
+        {
+            uniform_locations[name] = glGetUniformLocation(ID, name.c_str());
+        }
+        glUniformMatrix4fv(uniform_locations[name], 1, GL_FALSE, value);
     }
-    void setVec4(const std::string& name, const glm::vec4 value[], int amount) 
+    // ------------------------------------------------------------------------
+    void setVec4(const std::string& name, const glm::vec4& value)
     {
         if (current_shader_id != ID)
             use();
-        glUniform4fv(glGetUniformLocation(ID, name.c_str()), amount, glm::value_ptr(value[0]));
-	}
+
+        if (uniform_locations.find(name) == uniform_locations.end())
+        {
+            uniform_locations[name] = glGetUniformLocation(ID, name.c_str());
+        }
+        glUniform4fv(uniform_locations[name], 1, glm::value_ptr(value));
+    }
+    void setVec4(const std::string& name, const glm::vec4 value[], int amount)
+    {
+        if (current_shader_id != ID)
+            use();
+
+        if (uniform_locations.find(name) == uniform_locations.end())
+        {
+            uniform_locations[name] = glGetUniformLocation(ID, name.c_str());
+        }
+        glUniform4fv(uniform_locations[name], amount, glm::value_ptr(value[0]));
+    }
     // ------------------------------------------------------------------------
     void setVec3(const std::string& name, const glm::vec3& value)
     {
         if (current_shader_id != ID)
             use();
-        glUniform3fv(glGetUniformLocation(ID, name.c_str()), 1, glm::value_ptr(value));
+
+        if (uniform_locations.find(name) == uniform_locations.end())
+        {
+            uniform_locations[name] = glGetUniformLocation(ID, name.c_str());
+        }
+        glUniform3fv(uniform_locations[name], 1, glm::value_ptr(value));
     }
 
 private:

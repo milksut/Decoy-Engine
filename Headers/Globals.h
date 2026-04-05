@@ -31,6 +31,7 @@ enum Key_state
 #include <memory>
 #include <stack>
 #include <functional>
+#include <unordered_map>
 
 #include <iostream>
 #include <ctime>
@@ -538,13 +539,24 @@ namespace Logger
 		}
 	}
 
+	bool printed_debug_mode_warning = false;//to avoid filling the log with this warning
 	void checkGLError(const char* location)
 	{
+	#ifdef _DEBUG
 		GLenum error;
 		while ((error = glGetError()) != GL_NO_ERROR)
 		{
 			LOG_ERROR("OpenGL Error at %s : %s", location, getGLErrorString(error));
 		}
+	#else
+		if(!printed_debug_mode_warning)
+		{
+			LOG_WARNING("checkGLError is only active in debug mode, skipping check at %s", location);
+			printed_debug_mode_warning = true;
+		}
+		
+	#endif
+		
 	}
 }
 //end of namespaces-------------------------------------------------------------------------------

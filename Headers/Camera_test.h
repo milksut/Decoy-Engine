@@ -39,6 +39,7 @@ private:
 		{
 			camera_up = glm::normalize(glm::cross(camera_right, camera_front));
 		}
+		update_view_matrix();
 	}
 
 
@@ -53,6 +54,8 @@ public:
 	glm::vec3 world_up;
 
 	glm::mat4 projection;
+	glm::mat4 view;
+
 	camera_test(
 		glm::vec3 position = glm::vec3(0.0f, 0.0f, 3.0f),
 		glm::vec3 camera_angles = glm::vec3(0.0f, 0.0f, 0.0f),
@@ -61,6 +64,7 @@ public:
 	{
 		update_camera_vectors(true,true,true);
 		update_projection();
+		update_view_matrix();
 	}
 
 	void update_projection(
@@ -135,6 +139,7 @@ public:
 	void update_camera_position(glm::vec3 position)
 	{
 		camera_position = position;
+		update_view_matrix();
 	}
 
 	void camera_move(
@@ -156,11 +161,13 @@ public:
 			camera_position += camera_up * velocity;
 		if (move_down)
 			camera_position -= camera_up * velocity;
+
+		update_view_matrix();
 	}
 
-	glm::mat4 get_view_matrix() const
+	void update_view_matrix()
 	{
-		return glm::lookAt(camera_position, camera_position + camera_front, camera_up);
+		view = glm::lookAt(camera_position, camera_position + camera_front, camera_up);
 	}
 };
 

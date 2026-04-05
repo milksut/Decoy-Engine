@@ -92,5 +92,15 @@ public:
 		quad_model.draw(*shader, region);
 
 	}
+	
+	void draw_last()
+	{
+		if(quad_model.Meshes.empty())
+		{
+			LOG_WARNING("Quad_renderer: No mesh to draw");
+			return;
+		}
+		quad_model.draw(*shader, region);
+	}
 
 };

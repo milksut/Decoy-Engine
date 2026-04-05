@@ -49,7 +49,7 @@ private:
 
 		bool can_override_vbo = false;
 
-		void bind_textures(Shader shader)
+		void bind_textures(Shader& shader)
 		{
 			//these are sent as uniforms to shader as sampler 2d arrays like TEXTURE[], DIFFUSE[] etc. What name is defined in globals.h
 			//sent data amount is sent as int array named TEX_COUNTS[], they are in order of enum TextureType
@@ -224,7 +224,7 @@ private:
 				glBindBuffer(GL_ARRAY_BUFFER, VBO_Mesh);
 
 				glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(vertex_data), nullptr,
-					use_dynamic_draw ? GL_DYNAMIC_DRAW : GL_STATIC_DRAW);//new
+					use_dynamic_draw ? GL_DYNAMIC_DRAW : GL_STATIC_DRAW);//orphan
 
 				glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(vertex_data), &vertices[0],
 					use_dynamic_draw ? GL_DYNAMIC_DRAW : GL_STATIC_DRAW);//new
@@ -426,7 +426,7 @@ private:
 			glBindBuffer(GL_ARRAY_BUFFER, 0);
 		}
 
-		void draw(Shader& shader, std::shared_ptr<class_region> region, int amount = 1)
+		void draw(Shader& shader, std::shared_ptr<class_region>& region, int amount = 1)
 		{
 			bind_textures(shader);
 			
@@ -472,7 +472,6 @@ private:
 				glDrawArraysInstanced(GL_POINTS, 0, main_vertices.size(), amount);
 			}
 			draw_call_count++;
-			glBindVertexArray(0);
 		}
 	};
 
@@ -642,7 +641,7 @@ public:
 		Meshes.push_back(std::make_shared<Mesh>(vertices, indices, textures));
 	}
 
-	void draw(Shader shader, std::shared_ptr<class_region> region, int amount = 1)
+	void draw(Shader& shader, std::shared_ptr<class_region>& region, int amount = 1)
 	{
 		for(std::shared_ptr<Mesh> pointer : Meshes)
 		{

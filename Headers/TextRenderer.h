@@ -6,7 +6,6 @@
 
 
 #include <fstream>
-#include <unordered_map>
 
 #include "Some_functions.h"
 #include "Quad_renderer.h"
@@ -45,6 +44,8 @@ public:
 	float tolerances[8];
 	glm::vec4 replace_colors[8];
 	int num_color = 0;
+
+	std::string last_rendered_text = "";
 
 	TextRenderer(
 		const char* texture_path, const char* char_set_path,
@@ -156,6 +157,13 @@ public:
 
 		if (text.empty())
 			return;
+
+		if(text == last_rendered_text)
+		{
+			renderer->draw_last();
+			return;
+		}
+
 		int text_size = text.size();
 
 		const float add_advance_per_char_temp = add_advance_per_char <0 ? -1 * add_advance_per_char/2 : 0;
