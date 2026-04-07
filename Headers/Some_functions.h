@@ -5,6 +5,18 @@
 #include <iostream>
 #include "stb_image.h"
 
+/// <summary>
+/// Loads an image from disk and creates an OpenGL 2D texture.
+/// The image is optionally flipped vertically and uploaded to the GPU.
+/// Texture parameters (wrapping and filtering) and mipmaps are configured automatically.
+/// </summary>
+/// <param name="image_path">[in] File path of the image to load</param>
+/// <param name="width">[out] Width of the loaded image in pixels</param>
+/// <param name="height">[out] Height of the loaded image in pixels</param>
+/// <param name="nrChannels">[out] Number of color channels in the image (e.g., RGB = 3, RGBA = 4)</param>
+/// <param name="packing">[in] Pixel alignment for OpenGL unpacking (default is 4 bytes)</param>
+/// <param name="flip_vertically">[in] Whether to flip the image vertically during loading</param>
+/// <returns>OpenGL texture ID if successful, 0 if loading fails</returns>
 unsigned int load_image(const char* image_path, int& width, int& height, int& nrChannels, const int packing = 4, const bool flip_vertically = true)
 {
 	unsigned int texture;
@@ -59,6 +71,17 @@ unsigned int load_image(const char* image_path, int& width, int& height, int& nr
 
 }
 
+/// <summary>
+/// Initializes a GLFW window with the specified width, height, and title.
+/// Sets the OpenGL context version and profile, creates the window, 
+/// and loads OpenGL functions using GLAD.
+/// </summary>
+/// <param name="width">[in] Width of the window in pixels</param>
+/// <param name="height">[in] Height of the window in pixels</param>
+/// <param name="window_name">[in] Title of the window</param>
+/// <returns>
+/// Pointer to the created GLFWwindow if successful; nullptr if initialization or creation fails
+/// </returns>
 GLFWwindow* init_window(int width, int height, const char* window_name)
 {
 	if (!glfwInit()) {

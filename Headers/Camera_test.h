@@ -8,6 +8,13 @@ class camera_test
 private:
 
 	
+	/// <summary>
+	/// Updates the camera direction vectors (front, right, up) based on the provided flags and camera angles.
+	/// Recalculates the view matrix after updating vectors.
+	/// </summary>
+	/// <param name="front_change">[in] If true, recalculates the front vector of the camera.</param>
+	/// <param name="right_change">[in] If true, recalculates the right vector of the camera.</param>
+	/// <param name="up_change">[in] If true, recalculates the up vector of the camera.</param>
 	void update_camera_vectors(bool front_change, bool right_change, bool up_change)
 	{
 		if (front_change)
@@ -67,6 +74,14 @@ public:
 		update_view_matrix();
 	}
 
+
+	/// <summary>
+	/// Updates the camera's projection matrix using perspective projection based on the provided parameters.
+	/// </summary>
+	/// <param name="fov">[in] Field of view in degrees. Default is 45.0f.</param>
+	/// <param name="aspect_ratio">[in] Aspect ratio of the screen (width / height). Default is 800.0f / 600.0f.</param>
+	/// <param name="near_plane">[in] Near clipping plane distance. Default is 0.1f.</param>
+	/// <param name="far_plane">[in] Far clipping plane distance. Default is 100.0f.</param>
 	void update_projection(
 		float fov = 45.0f, float aspect_ratio = 800.0f / 600.0f,
 		float near_plane = 0.1f, float far_plane = 100.0f)
@@ -75,6 +90,14 @@ public:
 	}
 
 	bool flip = false;
+
+	/// <summary>
+	/// Processes mouse movement input and updates the camera's angles (pitch, yaw, roll) accordingly.
+	/// Updates the camera vectors after applying the changes.
+	/// </summary>
+	/// <param name="xoffset">[in] The horizontal mouse movement offset.</param>
+	/// <param name="yoffset">[in] The vertical mouse movement offset.</param>
+	/// <param name="sensitivity">[in] Sensitivity factor for the mouse movement. Default is 0.1f.</param>
 	void process_mouse_movement(float xoffset, float yoffset, float sensitivity = 0.1f)
 	{
 		xoffset *= sensitivity;
@@ -126,6 +149,11 @@ public:
 		update_camera_vectors(true,true,true);
 	}
 
+	/// <summary>
+	/// Tilts (rolls) the camera around its front axis by the given angle.
+	/// Updates the right and up vectors after applying the tilt.
+	/// </summary>
+	/// <param name="angle">[in] The angle in degrees to tilt the camera. Positive values tilt clockwise.</param>
 	void camera_tilt(float angle)
 	{
 		camera_angles.z += angle;
@@ -136,12 +164,29 @@ public:
 		update_camera_vectors(false, true, true);
 	}
 
+	/// <summary>
+	/// Updates the camera's world position to the specified coordinates.
+	/// Automatically updates the view matrix after changing the position.
+	/// </summary>
+	/// <param name="position">[in] The new position of the camera as a glm::vec3 (x, y, z).</param>
 	void update_camera_position(glm::vec3 position)
 	{
 		camera_position = position;
 		update_view_matrix();
 	}
 
+	/// <summary>
+	/// Moves the camera in 3D space based on the input movement flags and speed.
+	/// Updates the view matrix after applying the movement.
+	/// </summary>
+	/// <param name="delta_time">[in] Time elapsed since the last frame, used to scale movement speed.</param>
+	/// <param name="speed">[in] Movement speed multiplier. Default is 2.5f.</param>
+	/// <param name="move_forward">[in] If true, moves the camera forward along the front vector.</param>
+	/// <param name="move_backward">[in] If true, moves the camera backward along the front vector.</param>
+	/// <param name="move_left">[in] If true, moves the camera left along the right vector.</param>
+	/// <param name="move_right">[in] If true, moves the camera right along the right vector.</param>
+	/// <param name="move_up">[in] If true, moves the camera up along the up vector.</param>
+	/// <param name="move_down">[in] If true, moves the camera down along the up vector.</param>
 	void camera_move(
 		float delta_time, float speed = 2.5f,
 		bool move_forward = false, bool move_backward = false,
@@ -165,6 +210,10 @@ public:
 		update_view_matrix();
 	}
 
+	/// <summary>
+	/// Updates the camera's view matrix based on its current position, front, and up vectors.
+	/// This matrix is used for rendering the scene from the camera's perspective.
+	/// </summary>
 	void update_view_matrix()
 	{
 		view = glm::lookAt(camera_position, camera_position + camera_front, camera_up);

@@ -26,6 +26,15 @@ private:
 
 	std::unordered_map<uint32_t, std::pair<float, float>> char_pos;
 
+	/// <summary>
+	/// Extracts the ASCII code from a string formatted with two spaces around the number.
+	/// For example, given "Key 65 Pressed", it will return 65.
+	/// Returns -1 if the string does not contain exactly two spaces.
+	/// </summary>
+	/// <param name="str">[in] Input string containing the ASCII code between two spaces</param>
+	/// <returns>
+	/// The ASCII code as an integer if found; -1 if the expected format is not met
+	/// </returns>
 	static int get_ascii_code(const std::string& str)
 	{
 		size_t start = str.find(' '); // find first space
@@ -47,6 +56,23 @@ public:
 
 	std::string last_rendered_text = "";
 
+
+	/// <summary>
+	/// Constructs a TextRenderer object for rendering text using a texture atlas.
+	/// Loads the texture, character set, and sets up rendering parameters including screen and character sizes.
+	/// Also initializes the shader with optional geometry shader and prepares character positions for rendering.
+	/// </summary>
+	/// <param name="texture_path">[in] Path to the texture atlas image</param>
+	/// <param name="char_set_path">[in] Path to the character set file</param>
+	/// <param name="screen_width">[in] Width of the screen in pixels</param>
+	/// <param name="screen_height">[in] Height of the screen in pixels</param>
+	/// <param name="char_width">[in] Width of a single character in the texture atlas</param>
+	/// <param name="char_height">[in] Height of a single character in the texture atlas</param>
+	/// <param name="vertex_shader_path">[in] File path to the vertex shader</param>
+	/// <param name="fragment_shader_path">[in] File path to the fragment shader</param>
+	/// <param name="geometry_shader_path">[in] File path to the geometry shader</param>
+	/// <param name="add_advance_per_char">[in] Extra horizontal spacing added per character (default 0.0f)</param>
+	/// <param name="image_packing">[in] Pixel alignment for the texture image (default 4)</param>
 	TextRenderer(
 		const char* texture_path, const char* char_set_path,
 		const int screen_width, const int screen_height,
@@ -109,11 +135,25 @@ public:
 		file.close();
 	}
 
+	/// <summary>
+	/// Destructor for TextRenderer.
+	/// Cleans up the texture loaded into GPU memory by deleting it from Texture_slots.
+	/// </summary>
 	~TextRenderer()
 	{
 		Texture_slots::delete_texture(texture_atlas.id);
 	}
 
+	/// <summary>
+	/// Updates a deleted color slot with a new deleted color, tolerance, and replacement color.
+	/// </summary>
+	/// <param name="index_of_color">[in] Index of the slot to update in the deleted colors list (0-7)</param>
+	/// <param name="new_deleted_color">[in] The color that will be marked as deleted (stored in deleted_colors array)</param>
+	/// <param name="tolerance">[in] Matching tolerance for deletion; how close a color needs to be to be considered deleted (default 0.5f)</param>
+	/// <param name="new_replace_color">[in] Color to replace the deleted color with (stored in replace_colors array, default transparent white)</param>
+	/// <returns>
+	/// The index of the updated color slot; returns -1 if the index is invalid
+	/// </returns>
 	int change_deleted_colors(int index_of_color, const glm::vec4& new_deleted_color, float tolerance = 0.5f, const glm::vec4& new_replace_color = glm::vec4(1.0f, 1.0f, 1.0f, 0.0f))
 	{
 		if (index_of_color < 0 || index_of_color > 7)
@@ -128,6 +168,9 @@ public:
 		return index_of_color;
 	}
 
+	/// <summary>
+	/// Sends the current deleted colors, replacement colors, and tolerances to the GPU shader.
+	/// </summary>
 	void push_deleted_colors()
 	{
 		shader.use();
@@ -137,6 +180,11 @@ public:
 		shader.setInt("num_colors", num_color);
 	}
 
+	/// <summary>
+	/// Updates the screen dimensions and recalculates the normalized character width and height for rendering.
+	/// </summary>
+	/// <param name="new_width">[in] The new width of the screen in pixels.</param>
+	/// <param name="new_height">[in] The new height of the screen in pixels.</param>
 	void change_screen_size(int new_width, int new_height)
 	{
 		screen_width = new_width;
@@ -145,6 +193,10 @@ public:
 		screen_char_height = static_cast<float>(char_height) / screen_height;
 	}
 
+	/// <summary>
+	/// Updates the additional advance per character and recalculates the normalized character width and height for rendering.
+	/// </summary>
+	/// <param name="new_value">[in] The new value to add to the horizontal advance of each character.</param>
 	void change_add_advance_per_char(float new_value)
 	{
 		add_advance_per_char = new_value;
@@ -152,6 +204,14 @@ public:
 		screen_char_height = static_cast<float>(char_height) / screen_height;
 	}
 
+	/// <summary>
+	/// Renders the given text on the screen at the specified starting coordinates with the provided scale factor.
+	/// It calculates positions and texture coordinates for each character and sends them to the renderer.
+	/// </summary>
+	/// <param name="text">[in] The string of text to render.</param>
+	/// <param name="starting_x">[in] The x-coordinate on the screen where rendering starts.</param>
+	/// <param name="starting_y">[in] The y-coordinate on the screen where rendering starts.</param>
+	/// <param name="scale_factor">[in] The scaling factor to apply to the character size.</param>
 	void render_text(const std::string& text, float starting_x, float starting_y, float scale_factor)
 	{
 
