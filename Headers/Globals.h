@@ -55,6 +55,7 @@ enum Key_state
 
 #else
 #include <unistd.h>
+#include <sys/stat.h>
 #define MKDIR(path) mkdir(path, 0755)
 #define STAT_STRUCT stat
 #define STAT_FUNC   stat
