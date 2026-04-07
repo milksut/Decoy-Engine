@@ -13,6 +13,9 @@ external/
 #Visual Studio 
 .vs/
 
+#Visual Studio code
+.vscode/
+
 #Logs
 Logs/
 
