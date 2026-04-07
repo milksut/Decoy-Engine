@@ -16,8 +16,9 @@ if(MSVC)
     set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "${CMAKE_CXX_FLAGS_RELEASE} /O2 /arch:AVX2 /GL")
 else()
     # GCC/Clang
-    set(CMAKE_CXX_FLAGS_DEBUG "-g")
-    set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "-O2 -g")
+    set(CMAKE_CXX_FLAGS_DEBUG "-g -O0")
+    set(CMAKE_CXX_FLAGS_RELEASE "-O3 -march=native -flto")
+    set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "-O3 -march=native -g -flto")
 endif()
 
 

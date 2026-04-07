@@ -175,7 +175,7 @@ int main()
 	backpack.import_model_from_file("Models/Tree1.obj");
 	
 	//-*-*-*-*-*-*-*-**-*-*-*-*-**-*-*-*-*-*-*-*-*-*-*-*-*-*-*-**-*-*-*-*-*-*-*-*
-	int grid_amount = 60;
+	int grid_amount = 50;
 	//-*-*-*-*-*-*-*-**-*-*-*-*-**-*-*-*-*-*-*-*-*-*-*-*-*-*-*-**-*-*-*-*-*-*-*-*
 
 	std::shared_ptr<class_region> grid_region = backpack.reserve_class_region(grid_amount * grid_amount);
