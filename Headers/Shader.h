@@ -74,6 +74,25 @@ public:
         // delete the shaders as they're linked into our program now and no longer necessary
         glDeleteShader(vertex);
         glDeleteShader(fragment);
+        
+        
+        //This part makes every shader to use our Materials UBO that defined at globals,
+        GLuint blockIndex = glGetUniformBlockIndex(ID, "Materials");
+        if(blockIndex == GL_INVALID_INDEX)
+        {
+            LOG_INFO("Shader with id: %d dont have a Materials block, skipping material UBO Binding");
+		}
+        else
+        {
+            if(!Material_slots::init_flag)
+            {
+                Material_slots::init_material_slots();
+		    }
+            glUniformBlockBinding(ID, blockIndex, MATERIAL_UBO_BINDING);
+            Logger::checkGLError("after adding Material ubo");
+        }
+        
+
     }
     // adding geometry shader is optional
     // ------------------------------------------------------------------------

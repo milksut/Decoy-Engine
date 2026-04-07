@@ -71,24 +71,29 @@ private:
 			shader.setInt("TEX_COUNTS", counts, Tex_type_amount);
 			for(int i = 0; i<Tex_type_amount;i++)
 			{
-				shader.setInt(Tex_Types_Names[i], texture_locations[i].data(), counts[i]);
+				if(counts[i] > 0)
+				{
+					shader.setInt(Tex_Types_Names[i], texture_locations[i].data(), counts[i]);
+				}
+				
 			}
 
 			glActiveTexture(GL_TEXTURE0);
-			
-			shader.setBool("material.uses_material", mesh_material.uses_material);
-
-			if (mesh_material.uses_material)
+			if (!Material_slots::init_flag)
 			{
-				shader.setVec3("material.ambient", mesh_material.ambient);
-				shader.setVec3("material.diffuse", mesh_material.diffuse);
-				shader.setVec3("material.specular", mesh_material.specular);
-				shader.setFloat("material.shininess", mesh_material.shininess);
-				shader.setVec3("material.emission", mesh_material.emission);
-				shader.setInt("material.opacity", mesh_material.opacity);
-				shader.setInt("material.index_of_refraction", mesh_material.index_of_refraction);
-				shader.setInt("material.illumination_model", mesh_material.illumination_model);
+				Material_slots::init_material_slots();
 			}
+			int material_index = -1;//-1 means no material
+			if(mesh_material_id > 0)
+			{
+				material_index = Material_slots::get_index_of_bound_slot(mesh_material_id);
+				if( material_index < 0)
+				{
+					LOG_INFO("Mesh with material ID %d has no bound material! Binding now.", mesh_material_id);
+					material_index = Material_slots::bound_material(mesh_material_id);
+				}
+			}
+			shader.setInt("material_index", material_index);
 
 		}
 		
@@ -135,8 +140,7 @@ private:
 		std::shared_ptr<class_region> last_bound_region = nullptr;
 
 		//material properties for this mesh:
-		//uses material - ambient - diffuse - specular - shininess - emission - opacity - index_of_refraction - illumination_model
-		material_properties mesh_material = { false, glm::vec3(1.0f), glm::vec3(1.0f), glm::vec3(1.0f), 32.0f, glm::vec3(0.0f), 1.0f, 1.0f, 0 };
+		unsigned int mesh_material_id = 0;
 
 		unsigned int VAO, VBO_Mesh, EBO;
 
@@ -507,7 +511,7 @@ private:
 		std::vector<vertex_data> vertices;
 		std::vector<unsigned int> indices;
 		std::vector<Texture> textures;
-		material_properties mat_props = { false, glm::vec3(1.0f), glm::vec3(1.0f), glm::vec3(1.0f), 32.0f, glm::vec3(0.0f), 1.0f, 1.0f, 0 };
+		material_properties mat_props = {};
 		//process vertices
 		for (unsigned int i = 0; i < mesh->mNumVertices; i++)
 		{
@@ -595,9 +599,6 @@ private:
 			aiColor3D color;
 			float value;
 			int illum;
-			aiString name;
-			if (AI_SUCCESS == material->Get(AI_MATKEY_NAME, name))
-				mat_props.uses_material = true;
 
 			if (AI_SUCCESS == material->Get(AI_MATKEY_COLOR_AMBIENT, color))
 				mat_props.ambient = glm::vec3(color.r, color.g, color.b);
@@ -623,9 +624,12 @@ private:
 			if (AI_SUCCESS == material->Get(AI_MATKEY_SHADING_MODEL, illum))
 				mat_props.illumination_model = illum;
 		}
-
+		if (!Material_slots::init_flag)
+		{
+			Material_slots::init_material_slots();
+		}
 		std::shared_ptr<Mesh> mesh_ptr = std::make_shared<Mesh>(vertices,indices,textures);
-		mesh_ptr->mesh_material = mat_props;
+		mesh_ptr->mesh_material_id = Material_slots::register_material(mat_props);
 		return mesh_ptr;
 	}
 

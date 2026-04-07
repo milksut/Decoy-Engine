@@ -384,7 +384,6 @@ int main()
 			fps_text = "FPS: " + std::to_string(y);
 			LOG_INFO("FPS: %d Draw calls per second: %d", y, draw_call_count);
 			draw_call_count = 0;
-			printer->render_text(fps_text, -1, 0.9, 2.0f);
 		}
 		printer->render_text(fps_text, -1, 0.9, 2.0f);
 		Logger::checkGLError("After drawing fps");

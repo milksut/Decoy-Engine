@@ -8,6 +8,9 @@
 
 #define OPENGL_VERSION_MAJOR 3
 #define OPENGL_VERSION_MINOR 3
+
+#define MATERIAL_UBO_BINDING  0  // binding point 0 = materials
+#define MAX_MATERIALS        128  // max materials in UBO array, can be increased if needed, but keep in mind that UBOs have size limits (usually around 64KB)
 //end of defines---------------------------------------------------------------------------------
 
 //Enums -----------------------------------------------------------------------------------------
@@ -161,15 +164,18 @@ struct class_region //VBO regions given to classes and data inside them
 
 struct material_properties
 {
-	bool uses_material;
+	// every vec3 needs a float pad after it in std140
 	glm::vec3 ambient;
-	glm::vec3 diffuse;
-	glm::vec3 specular;
 	float shininess;
-	glm::vec3 emission; //object emits light
+
+	glm::vec3 diffuse;
 	float opacity;
-	float index_of_refraction; //how much light bends when entering the material
-	int illumination_model; //illumination model used by the material
+
+	glm::vec3 specular;
+	float index_of_refraction;//how much light bends when entering the material
+
+	glm::vec3 emission;//object emits light		
+	float illumination_model;//illumination model used by the material 
 };
 
 struct Input_key
@@ -207,221 +213,6 @@ bool createFolder(const std::string& path) {
 
 
 //Namespaces--------------------------------------------------------------------------------------
-namespace Texture_slots {
-	std::vector<Texture> loaded_textures; //to avoid loading duplicated textures, includes all textures bound or unbound.
-	std::stack<int> deleted_textures;
-
-	unsigned int bound_slots[TEXTURE_SLOTS] = { 0 };//active texture slots like GL_TEXTURE0,for index 0 means GL_TEXTURE0 and var is texture id
-
-	unsigned int slot_age[TEXTURE_SLOTS] = { 0 };//to track usage age of slots for replacement if needed
-
-	void new_texture_loaded(const Texture& texture)
-	{
-		if(loaded_textures.capacity()<100)
-			loaded_textures.reserve(100);
-
-		if(deleted_textures.empty())
-			loaded_textures.push_back(texture);
-		else
-		{
-			loaded_textures[deleted_textures.top()] = texture;
-			deleted_textures.pop();
-		}
-
-	}
-
-	Texture* get_loaded_texture(const std::string& path)
-	{
-		for (Texture& tex : loaded_textures)
-		{
-			if (tex.path == path)
-			{
-				return &tex;
-			}
-		}
-		return nullptr;
-		
-	}
-
-	void age_slots()
-	{
-		slot_age[0] += bound_slots[0] <= 0 ? 0 : 2; //becouse slot 0 is mostly used during other texture bindings we try to free it as much as possible
-		for (int i = 1; i < TEXTURE_SLOTS; ++i) {
-			if (bound_slots[i] != 0) {
-				slot_age[i]++;
-			}
-		}
-	}
-
-	int get_oldest_slot()
-	{
-		int oldest_index = 0;
-		unsigned int max_age = 0;
-		for (int i = 0; i < TEXTURE_SLOTS; ++i) {
-			if (slot_age[i] > max_age) {
-				max_age = slot_age[i];
-				oldest_index = i;
-			}
-		}
-		return oldest_index;
-	}
-
-	int get_index_of_bound_slot(const unsigned int texture_id)
-	{
-		for (int i = 0; i < TEXTURE_SLOTS; ++i) {
-			if (bound_slots[i] == texture_id) {
-				return i;
-			}
-		}
-		return -1;
-	}
-
-	int get_last_empty_space()//because slot 0 is mostly used during other texture bindings we start searching from last slot
-	{
-		for (int i = TEXTURE_SLOTS - 1; i >= 0; --i) {
-			if (bound_slots[i] <= 0) {
-				return i;
-			}
-		}
-		return -1;
-	}
-
-	void unbound_texture(const int slot_index)
-	{
-		if (slot_index >= 0 && slot_index < TEXTURE_SLOTS)
-		{
-			glActiveTexture(GL_TEXTURE0 + slot_index);
-			glBindTexture(GL_TEXTURE_2D, 0);
-			bound_slots[slot_index] = 0;
-			slot_age[slot_index] = 0;
-		}
-	}
-
-	int bound_texture(const unsigned int texture_id)
-	{
-		int slot_index = get_index_of_bound_slot(texture_id);
-		if (slot_index != -1) {
-			// Texture is already bound, reset its age
-			slot_age[slot_index] = 0;
-			return slot_index;
-		}
-		slot_index = get_last_empty_space();
-
-		if (slot_index == -1)
-		{
-			// No available texture slots, replace the oldest one
-			slot_index = get_oldest_slot();
-			unbound_texture(slot_index);
-		}
-
-		glActiveTexture(GL_TEXTURE0 + slot_index);
-		glBindTexture(GL_TEXTURE_2D, texture_id);
-		bound_slots[slot_index] = texture_id;
-		slot_age[slot_index] = 0; // Reset age since it's just been used
-		return slot_index;
-	}
-
-	void delete_texture(const unsigned int texture_id)
-	{
-		const int slot_index = get_index_of_bound_slot(texture_id);
-		if ( slot_index != -1)
-		{
-			unbound_texture(slot_index);
-		}
-
-		for (int i = 0; i < loaded_textures.size(); ++i)
-		{
-			if (loaded_textures[i].id == texture_id)
-			{
-				deleted_textures.push(i);
-			}
-		}
-
-
-	}
-
-}
-
-namespace Shader_variables
-{
-	unsigned int current_shader_id = 0;
-}
-
-namespace Event_management
-{
-	unsigned int event_id_counter = 0;
-
-	//Fill this part yourself
-	enum Event_type
-	{
-		Null,
-		Mouse_moved, Mouse_scrolled,
-		Mouse_button_pressed, Mouse_button_hold, Mouse_button_released,
-		Keyboard_button_pressed, Keyboard_button_hold, Keyboard_button_released,
-		Combo_button_pressed, Combo_button_hold, Combo_button_released,
-
-		LAST_EVENT_TYPE//always leave in bottom. Used to measure how many event types there are
-	};
-
-	enum class Event_timing { Immediate, Queued };
-	enum class Event_scope { Targeted, Announcement };
-
-	//forward declaration
-	class Event;
-
-	//must be implamented by anything that wants to use events,
-	//used when subscribeing a channel on event manager
-	//can be lambada, like if you don't want to bind it to a class
-	using Event_receiver_shared = std::shared_ptr<std::function<void(const Event&)>>;
-
-	//doesn't keep the receiver alive
-	using Event_receiver_weak = std::weak_ptr<std::function<void(const Event&)>>;
-
-	template<typename T>
-	Event_receiver_shared make_receiver(T&& lambda)
-	{
-		return std::make_shared<std::function<void(const Event&)>>(std::forward<T>(lambda));
-	}
-
-	//base event class, not designed to use at it is,
-	//create subclases to use it
-	class Event
-	{
-
-	public:
-		const unsigned int id = event_id_counter++;
-
-		Event_timing timing = Event_timing::Immediate;
-		Event_scope scope = Event_scope::Announcement;
-		Event_type type = Event_type::Null;
-		Event_receiver_weak target_receiver;
-
-		bool is_alive = true;
-
-		Event(const Event_timing timing, const Event_type type)
-		{
-			this->timing = timing;
-			this->type = type;
-		}
-		Event(const Event_timing timing, const Event_receiver_shared& target_receiver, const Event_type type)
-		{
-			this->timing = timing;
-			this->target_receiver = target_receiver;
-			this->scope = Event_scope::Targeted;
-			this->type = type;
-		}
-
-		virtual void execute() = 0;
-		virtual ~Event() {}
-
-	};
-
-
-
-
-
-}
-
 namespace Logger
 {
 	enum class LogLevel
@@ -559,4 +350,464 @@ namespace Logger
 		
 	}
 }
+
+namespace Texture_slots {
+	std::vector<Texture> loaded_textures; //to avoid loading duplicated textures, includes all textures bound or unbound.
+	std::queue<int> deleted_textures;
+
+	unsigned int bound_slots[TEXTURE_SLOTS] = { 0 };//active texture slots like GL_TEXTURE0,for index 0 means GL_TEXTURE0 and var is texture id
+
+	unsigned int slot_age[TEXTURE_SLOTS] = { 0 };//to track usage age of slots for replacement if needed
+
+	void new_texture_loaded(const Texture& texture)
+	{
+		if(loaded_textures.capacity()<100)
+			loaded_textures.reserve(100);
+
+		if(deleted_textures.empty())
+			loaded_textures.push_back(texture);
+		else
+		{
+			loaded_textures[deleted_textures.front()] = texture;
+			deleted_textures.pop();
+		}
+
+	}
+
+	Texture* get_loaded_texture(const std::string& path)
+	{
+		for (Texture& tex : loaded_textures)
+		{
+			if (tex.path == path)
+			{
+				return &tex;
+			}
+		}
+		return nullptr;
+		
+	}
+
+	void age_slots()
+	{
+		for (int i = 1; i < TEXTURE_SLOTS; ++i) {
+			if (bound_slots[i] != 0) {
+				slot_age[i]++;
+			}
+		}
+	}
+
+	int get_oldest_slot()
+	{
+		int oldest_index = 0;
+		unsigned int max_age = 0;
+		for (int i = 0; i < TEXTURE_SLOTS; ++i) {
+			if (slot_age[i] > max_age) {
+				max_age = slot_age[i];
+				oldest_index = i;
+			}
+		}
+		return oldest_index;
+	}
+
+	int get_index_of_bound_slot(const unsigned int texture_id)
+	{
+		for (int i = 0; i < TEXTURE_SLOTS; ++i) {
+			if (bound_slots[i] == texture_id) {
+				return i;
+			}
+		}
+		return -1;
+	}
+
+	int get_last_empty_space()//because slot 0 is mostly used during other texture bindings we start searching from last slot
+	{
+		for (int i = TEXTURE_SLOTS - 1; i >= 0; --i) {
+			if (bound_slots[i] <= 0) {
+				return i;
+			}
+		}
+		return -1;
+	}
+
+	void unbound_texture(const int slot_index)
+	{
+		if (slot_index >= 0 && slot_index < TEXTURE_SLOTS)
+		{
+			glActiveTexture(GL_TEXTURE0 + slot_index);
+			glBindTexture(GL_TEXTURE_2D, 0);
+			bound_slots[slot_index] = 0;
+			slot_age[slot_index] = 0;
+		}
+	}
+
+	int bound_texture(const unsigned int texture_id)
+	{
+		int slot_index = get_index_of_bound_slot(texture_id);
+		if (slot_index != -1) {
+			// Texture is already bound, reset its age
+			slot_age[slot_index] = 0;
+			return slot_index;
+		}
+		slot_index = get_last_empty_space();
+
+		if (slot_index == -1)
+		{
+			// No available texture slots, replace the oldest one
+			slot_index = get_oldest_slot();
+			unbound_texture(slot_index);
+		}
+
+		glActiveTexture(GL_TEXTURE0 + slot_index);
+		glBindTexture(GL_TEXTURE_2D, texture_id);
+		bound_slots[slot_index] = texture_id;
+		slot_age[slot_index] = 0; // Reset age since it's just been used
+		return slot_index;
+	}
+
+	void delete_texture(const unsigned int texture_id)
+	{
+		const int slot_index = get_index_of_bound_slot(texture_id);
+		if ( slot_index != -1)
+		{
+			unbound_texture(slot_index);
+		}
+
+		for (int i = 0; i < loaded_textures.size(); ++i)
+		{
+			if (loaded_textures[i].id == texture_id)
+			{
+				deleted_textures.push(i);
+			}
+		}
+
+
+	}
+
+}
+
+namespace Material_slots
+{
+
+
+	struct material_warapper // to add things like path that don't have stable size and don't send to shader to material_properties struct
+	{
+		material_properties mat_props;
+		unsigned int material_id; //unique id for this material, used for UBO indexing
+		material_warapper(const material_properties& mat_props)
+			:mat_props(mat_props)
+		{
+			static unsigned int next_material_id = 1;//THIS IS MUST BE STARTED FROM 1 BECAUSE 0 IS RESERVED FOR NO MATERIAL
+			material_id = next_material_id++;
+		}
+		material_warapper()
+			: mat_props{}, material_id(0)
+		{
+		}
+	};
+
+	bool init_flag = false; // nothing works if this is false, used to check if material slots are initialized before using
+	unsigned int material_ubo = 0; // UBO for materials
+	std::vector<material_warapper> materials; // to keep track of materials and their properties, also used for UBO indexing
+
+	unsigned int bound_materials[MAX_MATERIALS] = { 0 }; // to keep track of deleted materials for reuse of UBO slots
+	unsigned int slot_age[MAX_MATERIALS] = { 0 };//to track usage age of slots for replacement if needed
+
+
+	void init_material_slots()
+	{
+		if(init_flag)
+		{
+			LOG_WARNING("Material slots already initialized, skipping initialization.");
+			return;
+		}
+
+		glGenBuffers(1, &material_ubo);
+		glBindBuffer(GL_UNIFORM_BUFFER, material_ubo);
+		glBufferData(GL_UNIFORM_BUFFER,
+			MAX_MATERIALS * sizeof(material_properties),
+			nullptr, GL_DYNAMIC_DRAW);
+		glBindBufferBase(GL_UNIFORM_BUFFER, MATERIAL_UBO_BINDING, material_ubo);
+
+		glBindBuffer(GL_UNIFORM_BUFFER, 0);
+
+		LOG_INFO("UBO_slots initialized. Material UBO: %d bytes",
+			MAX_MATERIALS * (int)sizeof(material_properties));
+		
+		materials.reserve(MAX_MATERIALS);
+
+		init_flag = true;
+	}
+
+	int get_first_empty_space()
+	{
+		for (int i = 0; i < MAX_MATERIALS; i++) {
+			if (bound_materials[i] <= 0) {
+				return i;
+			}
+		}
+		return -1;
+	}
+
+	void age_slots()
+	{
+		for (int i = 1; i < MAX_MATERIALS; ++i) {
+			if (bound_materials[i] != 0) {
+				slot_age[i]++;
+			}
+		}
+	}
+
+	int get_oldest_slot()
+	{
+		int oldest_index = 0;
+		unsigned int max_age = 0;
+		for (int i = 0; i < MAX_MATERIALS; ++i) {
+			if (slot_age[i] > max_age) {
+				max_age = slot_age[i];
+				oldest_index = i;
+			}
+		}
+		return oldest_index;
+	}
+
+	int material_wrapper_index(unsigned int material_id)
+	{
+		if(materials.empty())
+			return -1;
+		if(material_id <=0)
+			return -1;
+
+		if(materials[material_id-1].material_id == material_id)
+			return material_id-1;
+
+		LOG_WARNING("Material ID %d does not match its wrapper index, searching for correct index...", material_id);
+
+		for (int i = 0; i < materials.size(); ++i)
+		{
+			if (materials[i].material_id == material_id)
+			{
+				return i;
+			}
+		}
+		return -1;
+	}
+
+	unsigned int material_exists(const material_properties& properties)
+	{
+		if(!init_flag)
+		{
+			LOG_ERROR("Material slots not initialized! Call init_material_slots() before checking for existing materials.");
+			return 0;
+		}
+
+		for (const material_warapper& mat : materials)
+		{
+			if (mat.mat_props.ambient == properties.ambient &&
+				mat.mat_props.diffuse == properties.diffuse &&
+				mat.mat_props.specular == properties.specular &&
+				mat.mat_props.shininess == properties.shininess &&
+				mat.mat_props.emission == properties.emission &&
+				mat.mat_props.opacity == properties.opacity &&
+				mat.mat_props.index_of_refraction == properties.index_of_refraction &&
+				mat.mat_props.illumination_model == properties.illumination_model)
+			{
+				return mat.material_id;
+			}
+		}
+		return 0;
+	}
+
+	unsigned int register_material(const material_properties& properties)
+	{
+		if (!init_flag)
+		{
+			LOG_ERROR("Material slots not initialized! Call init_material_slots() before registering materials.");
+			return 0;
+		}
+		unsigned int material_id = material_exists(properties);
+		if(material_id > 0)
+		{
+			return material_id;
+		}
+
+		material_warapper new_material{ properties};	
+		material_id = new_material.material_id;
+
+		materials.push_back(new_material);
+
+		LOG_INFO("Registered material with ID %d", material_id);
+
+		return material_id;
+	}
+	
+	material_properties get_material(const unsigned int material_id)
+	{
+		if (!init_flag)
+		{
+			LOG_ERROR("Material slots not initialized! Call init_material_slots() before getting materials.");
+			return {};
+		}
+		if(material_id <= 0)
+		{
+			LOG_ERROR("Invalid material ID %d! Material IDs must be greater than 0.", material_id);
+			return {};
+		}
+		int wrapper_index = material_wrapper_index(material_id);
+		if(wrapper_index != -1)
+		{
+			return materials[wrapper_index].mat_props;
+		}
+		return {};
+	}
+
+	int get_index_of_bound_slot(const unsigned int material_id)
+	{
+		if(material_id <= 0)
+		{
+			LOG_ERROR("Invalid material ID %d! Material IDs must be greater than 0.", material_id);
+			return -1;
+		}
+		for (int i = 0; i < MAX_MATERIALS; ++i) {
+			if (bound_materials[i] == material_id) {
+				return i;
+			}
+		}
+		return -1;
+	}
+
+	void unbound_material(const int slot_index)
+	{
+		if (slot_index >= 0 && slot_index < MAX_MATERIALS)
+		{
+			bound_materials[slot_index] = 0;
+			slot_age[slot_index] = 0;
+		}
+		else
+		{
+			LOG_ERROR("Invalid material slot index %d for unbinding!", slot_index);
+		}
+	}
+
+	int bound_material(const unsigned int material_id)
+	{
+		if(!init_flag)
+		{
+			LOG_ERROR("Material slots not initialized! Call init_material_slots() before binding materials.");
+			return -1;
+		}
+
+		if(material_id <= 0)
+		{
+			LOG_ERROR("Invalid material ID %d! Material IDs must be greater than 0.", material_id);
+			return -1;
+		}
+
+		int slot_index = get_index_of_bound_slot(material_id);
+		if (slot_index != -1) {
+			// Material is already bound, reset its age
+			slot_age[slot_index] = 0;
+			return slot_index;
+		}
+
+		slot_index = get_first_empty_space();
+		if (slot_index == -1)
+		{
+			// No available material slots, replace the oldest one
+			slot_index = get_oldest_slot();
+			unbound_material(slot_index);
+		}
+		bound_materials[slot_index] = material_id;
+		slot_age[slot_index] = 0; // Reset age since it's just been used
+
+		glBindBuffer(GL_UNIFORM_BUFFER, material_ubo);
+		glBufferSubData(GL_UNIFORM_BUFFER, slot_index * sizeof(material_properties), sizeof(material_properties),
+			&materials[material_wrapper_index(material_id)].mat_props);
+		glBindBuffer(GL_UNIFORM_BUFFER, 0);
+
+		LOG_INFO("Bound material with ID %d to slot %d", material_id, slot_index);
+		return slot_index;
+	}
+
+}
+
+namespace Shader_variables
+{
+	unsigned int current_shader_id = 0;
+}
+
+namespace Event_management
+{
+	unsigned int event_id_counter = 0;
+
+	//Fill this part yourself
+	enum Event_type
+	{
+		Null,
+		Mouse_moved, Mouse_scrolled,
+		Mouse_button_pressed, Mouse_button_hold, Mouse_button_released,
+		Keyboard_button_pressed, Keyboard_button_hold, Keyboard_button_released,
+		Combo_button_pressed, Combo_button_hold, Combo_button_released,
+
+		LAST_EVENT_TYPE//always leave in bottom. Used to measure how many event types there are
+	};
+
+	enum class Event_timing { Immediate, Queued };
+	enum class Event_scope { Targeted, Announcement };
+
+	//forward declaration
+	class Event;
+
+	//must be implamented by anything that wants to use events,
+	//used when subscribeing a channel on event manager
+	//can be lambada, like if you don't want to bind it to a class
+	using Event_receiver_shared = std::shared_ptr<std::function<void(const Event&)>>;
+
+	//doesn't keep the receiver alive
+	using Event_receiver_weak = std::weak_ptr<std::function<void(const Event&)>>;
+
+	template<typename T>
+	Event_receiver_shared make_receiver(T&& lambda)
+	{
+		return std::make_shared<std::function<void(const Event&)>>(std::forward<T>(lambda));
+	}
+
+	//base event class, not designed to use at it is,
+	//create subclases to use it
+	class Event
+	{
+
+	public:
+		const unsigned int id = event_id_counter++;
+
+		Event_timing timing = Event_timing::Immediate;
+		Event_scope scope = Event_scope::Announcement;
+		Event_type type = Event_type::Null;
+		Event_receiver_weak target_receiver;
+
+		bool is_alive = true;
+
+		Event(const Event_timing timing, const Event_type type)
+		{
+			this->timing = timing;
+			this->type = type;
+		}
+		Event(const Event_timing timing, const Event_receiver_shared& target_receiver, const Event_type type)
+		{
+			this->timing = timing;
+			this->target_receiver = target_receiver;
+			this->scope = Event_scope::Targeted;
+			this->type = type;
+		}
+
+		virtual void execute() = 0;
+		virtual ~Event() {}
+
+	};
+
+
+
+
+
+}
+
 //end of namespaces-------------------------------------------------------------------------------
