@@ -351,6 +351,7 @@ int main()
 	//-------------------------------------------------------------------------------------------------------------
 
 	glEnable(GL_DEPTH_TEST); // Enable depth testing for 3D rendering
+	glEnable(GL_CULL_FACE); // Enable face culling to improve performance
 	glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 	int x = 0, y = 0, z = 0;
 	double time_of_last_frame = 1;
