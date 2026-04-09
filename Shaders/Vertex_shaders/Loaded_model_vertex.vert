@@ -25,10 +25,10 @@ void main()
 		line2.z, line2.w, line3
 	);
 
-	FragPos = vec3(model * vec4(aPos, 1.0));
-
 	Normal =  transpose_inverse_model * aNormal;
 	TexCoord = aTexCoord;
-	gl_Position =  projectionXview * vec4(FragPos, 1.0);
+	vec4 worldPos = model * vec4(aPos, 1.0);
+	FragPos = vec3(worldPos);
+	gl_Position = projectionXview * worldPos;
 	
 }

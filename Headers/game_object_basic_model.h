@@ -552,6 +552,7 @@ private:
 			for (unsigned int j = 0; j < face.mNumIndices; j++)
 				indices.push_back(face.mIndices[j]);
 		}
+		bool uses_material_flag = false;
 		//process material
 		if (mesh->mMaterialIndex >= 0)
 		{
@@ -560,8 +561,8 @@ private:
 			for (int i = 0; i < Tex_type_amount; loop = !loop)
 			{
 				aiTextureType assimp_type = loop ? Assimp_Tex_Types[i] : Assimp_Tex_Types_2[i];
-				
-				for(int j = 0; j < material->GetTextureCount(assimp_type); j++)
+
+				for (int j = 0; j < material->GetTextureCount(assimp_type); j++)
 				{
 					Texture* texture;
 					aiString str;
@@ -573,7 +574,7 @@ private:
 					str.Set((directory + '\\' + str.C_Str()).c_str());
 
 					texture = Texture_slots::get_loaded_texture(str.C_Str());//check if texture was loaded before
-					if(texture != nullptr)
+					if (texture != nullptr)
 					{
 						textures.push_back(*texture);
 					}
@@ -583,7 +584,7 @@ private:
 						int unused_data1 = 0, unused_data2 = 0, unused_data3 = 0;
 						texture = new Texture();
 
-						texture->id = load_image(str.C_Str(),unused_data1,unused_data2,unused_data3);
+						texture->id = load_image(str.C_Str(), unused_data1, unused_data2, unused_data3);
 						texture->type = static_cast<TextureType>(i);
 						texture->path = str.C_Str();
 
@@ -591,44 +592,51 @@ private:
 						Texture_slots::new_texture_loaded(*texture);
 					}
 				}
-				
+
 				if (!loop) i++;
 			}
 
 			aiColor3D color;
 			float value;
 			int illum;
+			aiString name;
 
-			if (AI_SUCCESS == material->Get(AI_MATKEY_COLOR_AMBIENT, color))
-				mat_props.ambient = glm::vec3(color.r, color.g, color.b);
+			if (AI_SUCCESS == material->Get(AI_MATKEY_NAME, name))
+			{
 
-			if (AI_SUCCESS == material->Get(AI_MATKEY_COLOR_DIFFUSE, color))
-				mat_props.diffuse = glm::vec3(color.r, color.g, color.b);
+				if (AI_SUCCESS == material->Get(AI_MATKEY_COLOR_AMBIENT, color))
+					mat_props.ambient = glm::vec3(color.r, color.g, color.b);
 
-			if (AI_SUCCESS == material->Get(AI_MATKEY_COLOR_SPECULAR, color))
-				mat_props.specular = glm::vec3(color.r, color.g, color.b);
+				if (AI_SUCCESS == material->Get(AI_MATKEY_COLOR_DIFFUSE, color))
+					mat_props.diffuse = glm::vec3(color.r, color.g, color.b);
 
-			if (AI_SUCCESS == material->Get(AI_MATKEY_SHININESS, value))
-				mat_props.shininess = value;
+				if (AI_SUCCESS == material->Get(AI_MATKEY_COLOR_SPECULAR, color))
+					mat_props.specular = glm::vec3(color.r, color.g, color.b);
 
-			if (AI_SUCCESS == material->Get(AI_MATKEY_COLOR_EMISSIVE, color))
-				mat_props.emission = glm::vec3(color.r, color.g, color.b);
+				if (AI_SUCCESS == material->Get(AI_MATKEY_SHININESS, value))
+					mat_props.shininess = value;
 
-			if (AI_SUCCESS == material->Get(AI_MATKEY_OPACITY, value))
-				mat_props.opacity = value;
+				if (AI_SUCCESS == material->Get(AI_MATKEY_COLOR_EMISSIVE, color))
+					mat_props.emission = glm::vec3(color.r, color.g, color.b);
 
-			if (AI_SUCCESS == material->Get(AI_MATKEY_REFRACTI, value))
-				mat_props.index_of_refraction = value;
+				if (AI_SUCCESS == material->Get(AI_MATKEY_OPACITY, value))
+					mat_props.opacity = value;
 
-			if (AI_SUCCESS == material->Get(AI_MATKEY_SHADING_MODEL, illum))
-				mat_props.illumination_model = illum;
+				if (AI_SUCCESS == material->Get(AI_MATKEY_REFRACTI, value))
+					mat_props.index_of_refraction = value;
+
+				if (AI_SUCCESS == material->Get(AI_MATKEY_SHADING_MODEL, illum))
+					mat_props.illumination_model = illum;
+			}
+			if (!Material_slots::init_flag)
+			{
+				Material_slots::init_material_slots();
+			}
+			uses_material_flag = true;
 		}
-		if (!Material_slots::init_flag)
-		{
-			Material_slots::init_material_slots();
-		}
+
 		std::shared_ptr<Mesh> mesh_ptr = std::make_shared<Mesh>(vertices,indices,textures);
-		mesh_ptr->mesh_material_id = Material_slots::register_material(mat_props);
+		mesh_ptr->mesh_material_id = uses_material_flag ? Material_slots::register_material(mat_props) : 0;
 		return mesh_ptr;
 	}
 
