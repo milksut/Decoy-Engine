@@ -56,27 +56,30 @@ uniform Light lights[16];
 out vec4 FragColor;
 void main()
 {
-     vec3 diff_map_val;
-     vec3 spec_val;
-     float shininess;
-    if(material_index < 0 || material_index >= MAX_MATERIALS)
+     vec3 diff_map_val = vec3(0,0,0);
+     vec3 spec_val = vec3(0,0,0);
+     float shininess = 0;
+
+    for(int i=0; i<TEX_COUNTS[0];i++)
     {
-        
-        diff_map_val = vec3(texture(DIFFUSE[0], TexCoord));
-        spec_val = vec3(texture(SPECULAR[0],TexCoord));
-        shininess = 1;
+        diff_map_val += vec3(texture(DIFFUSE[i], TexCoord) / float(TEX_COUNTS[0]));
     }
-    else
+
+    for(int i=0; i<TEX_COUNTS[1];i++)
+    {
+        spec_val += vec3(texture(SPECULAR[i], TexCoord) / float(TEX_COUNTS[1]));
+    }
+
+    if(material_index >= 0 && material_index < MAX_MATERIALS)
     {
         Material material = materials[material_index];
-        diff_map_val = material.diffuse;
-        spec_val = material.specular;
+        diff_map_val = TEX_COUNTS[0]>0 ? diff_map_val * material.diffuse : material.diffuse;
+        spec_val = TEX_COUNTS[1]>0 ? spec_val * material.specular : material.specular;
         shininess = material.shininess;
     }
     
 	vec3 norm = normalize(Normal);
     vec3 total_light = vec3(0.0, 0.0, 0.0);
-    
 
     for(int i = 0; i < min(num_of_lights,16); i++)
     {
