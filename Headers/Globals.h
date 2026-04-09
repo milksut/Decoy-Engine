@@ -200,12 +200,23 @@ struct Key_combo
 
 
 //Functions--------------------------------------------------------------------------------------
+
+/// <summary>
+///		Checks if a folder exists at the specified path.
+/// </summary>
+/// <param name="path">[in] Path to check for folder existence.</param>
+/// <returns>True if folder exists, false otherwise.</returns>
 bool folderExists(const std::string& path) {
 	struct STAT_STRUCT info;
 	if (STAT_FUNC(path.c_str(), &info) != 0) return false;
 	return (info.st_mode & S_IFDIR) != 0;
 }
 
+/// <summary>
+///		Creates a folder at the specified path.
+/// </summary>
+/// <param name="path">[in] Path where the folder will be created.</param>
+/// <returns>True if folder creation succeeded, false otherwise.</returns>
 bool createFolder(const std::string& path) {
 	return MKDIR(path.c_str()) == 0;
 }
@@ -332,6 +343,11 @@ namespace Logger
 	}
 
 	bool printed_debug_mode_warning = false;//to avoid filling the log with this warning
+
+	/// <summary>
+	///		Checks for OpenGL errors and logs them. Active only in debug mode.
+	/// </summary>
+	/// <param name="location">[in] Location string to include in the log.</param>
 	void checkGLError(const char* location)
 	{
 	#ifdef _DEBUG
@@ -360,6 +376,12 @@ namespace Texture_slots {
 
 	unsigned int slot_age[TEXTURE_SLOTS] = { 0 };//to track usage age of slots for replacement if needed
 
+	/// <summary>
+	///		Adds a newly loaded texture to the loaded_textures vector.  
+	///		Manages deleted_textures queue for slot reuse.  
+	///		Does not bind the texture; use bind_texture for that.
+	/// </summary>
+	/// <param name="texture">[in] The texture to add to loaded_textures.</param>
 	void new_texture_loaded(const Texture& texture)
 	{
 		if(loaded_textures.capacity()<100)
@@ -375,6 +397,11 @@ namespace Texture_slots {
 
 	}
 
+	/// <summary>
+	///		Retrieves a loaded texture by its file path.
+	/// </summary>
+	/// <param name="path">[in] The file path of the texture to retrieve. </param>
+	/// <returns> A pointer to the loaded texture if found, nullptr otherwise. </returns>
 	Texture* get_loaded_texture(const std::string& path)
 	{
 		for (Texture& tex : loaded_textures)
@@ -388,6 +415,10 @@ namespace Texture_slots {
 		
 	}
 
+	/// <summary>
+	///		Increments the age of all currently bound texture slots.  
+	///		Call this at the end of each frame to track how long textures have been bound.
+	/// </summary>
 	void age_slots()
 	{
 		for (int i = 1; i < TEXTURE_SLOTS; ++i) {
@@ -397,6 +428,10 @@ namespace Texture_slots {
 		}
 	}
 
+	/// <summary>
+	///		Finds the index of the oldest bound texture slot based on slot ages.
+	/// </summary>
+	/// <returns>[out] Index of the oldest bound texture slot.</returns>
 	int get_oldest_slot()
 	{
 		int oldest_index = 0;
@@ -410,6 +445,11 @@ namespace Texture_slots {
 		return oldest_index;
 	}
 
+	/// <summary>
+	///		Finds the bound slot index for a given texture ID.
+	/// </summary>
+	/// <param name="texture_id">[in] The texture ID to check.</param>
+	/// <returns>[out] Index of the slot if bound, or -1 if not found.</returns>
 	int get_index_of_bound_slot(const unsigned int texture_id)
 	{
 		for (int i = 0; i < TEXTURE_SLOTS; ++i) {
@@ -420,7 +460,11 @@ namespace Texture_slots {
 		return -1;
 	}
 
-	int get_last_empty_space()//because slot 0 is mostly used during other texture bindings we start searching from last slot
+	/// <summary>
+	///		Finds the last empty texture slot for binding a new texture.
+	/// </summary>
+	/// <returns>[out] Index of the last empty slot, or -1 if none found.</returns>
+	int get_last_empty_space() // slot 0 genellikle dolu olduðu için sondan aranýr
 	{
 		for (int i = TEXTURE_SLOTS - 1; i >= 0; --i) {
 			if (bound_slots[i] <= 0) {
@@ -430,6 +474,10 @@ namespace Texture_slots {
 		return -1;
 	}
 
+	/// <summary>
+	///		Unbinds a texture from a slot and resets its tracking info.
+	/// </summary>
+	/// <param name="slot_index">[in] Index of the texture slot to unbind.</param>
 	void unbound_texture(const int slot_index)
 	{
 		if (slot_index >= 0 && slot_index < TEXTURE_SLOTS)
@@ -441,6 +489,11 @@ namespace Texture_slots {
 		}
 	}
 
+	/// <summary>
+	///		Binds a texture to an available slot or replaces the oldest if all are full.
+	/// </summary>
+	/// <param name="texture_id">[in] The ID of the texture to bind.</param>
+	/// <returns>[out] Index of the texture slot to which the texture was bound.</returns>
 	int bound_texture(const unsigned int texture_id)
 	{
 		int slot_index = get_index_of_bound_slot(texture_id);
@@ -465,6 +518,10 @@ namespace Texture_slots {
 		return slot_index;
 	}
 
+	/// <summary>
+	///		Deletes a texture by unbinding it from its slot and adding it to the deleted_textures queue for reuse.
+	/// </summary>
+	/// <param name="texture_id">[in] The ID of the texture to delete.</param>
 	void delete_texture(const unsigned int texture_id)
 	{
 		const int slot_index = get_index_of_bound_slot(texture_id);
@@ -542,8 +599,6 @@ namespace Material_slots
 	unsigned int bound_materials[MAX_MATERIALS] = { 0 }; // to keep track of deleted materials for reuse of UBO slots
 	unsigned int slot_age[MAX_MATERIALS] = { 0 };//to track usage age of slots for replacement if needed
 
-	int ubo_slot = -1;//to keep track of which UBO slot is used for material UBO, used for binding in shaders
-
 
 	void init_material_slots()
 	{
@@ -577,6 +632,10 @@ namespace Material_slots
 		init_flag = true;
 	}
 
+	/// <summary>
+	/// Returns the index of the first empty material slot, or -1 if none available.
+	/// </summary>
+	/// <returns>Index of the first empty material slot, or -1 if all slots are occupied.</returns>
 	int get_first_empty_space()
 	{
 		for (int i = 0; i < MAX_MATERIALS; i++) {
@@ -587,6 +646,9 @@ namespace Material_slots
 		return -1;
 	}
 
+	/// <summary>
+	/// Increments the age of bound material slots per frame.
+	/// </summary>
 	void age_slots()
 	{
 		for (int i = 1; i < MAX_MATERIALS; ++i) {
@@ -596,6 +658,10 @@ namespace Material_slots
 		}
 	}
 
+	/// <summary>
+	/// Returns the index of the oldest bound material slot.
+	/// </summary>
+	/// <returns>[out] Index of the oldest material slot.</returns>
 	int get_oldest_slot()
 	{
 		int oldest_index = 0;
@@ -609,6 +675,13 @@ namespace Material_slots
 		return oldest_index;
 	}
 
+	/// <summary>
+	/// Returns the index of the material wrapper for the given material ID.
+	/// </summary>
+	/// <param name="material_id">[in] ID of the material to find.</param>
+	/// <returns>
+	/// Index of the material in the materials vector; otherwise -1 if not found.
+	/// </returns>
 	int material_wrapper_index(unsigned int material_id)
 	{
 		if(materials.empty())
@@ -631,6 +704,13 @@ namespace Material_slots
 		return -1;
 	}
 
+	/// <summary>
+	/// Checks whether a material with the given properties already exists.
+	/// </summary>
+	/// <param name="properties">[in] Properties of the material to check.</param>
+	/// <returns>
+	/// ID of the existing material if found; otherwise 0.
+	/// </returns>
 	unsigned int material_exists(const material_properties& properties)
 	{
 		if(!init_flag)
@@ -656,6 +736,13 @@ namespace Material_slots
 		return 0;
 	}
 
+	/// <summary>
+	/// Registers a material with the given properties if it does not already exist.
+	/// </summary>
+	/// <param name="properties">[in] Properties of the material to register.</param>
+	/// <returns>
+	/// ID of the existing or newly registered material.
+	/// </returns>
 	unsigned int register_material(const material_properties& properties)
 	{
 		if (!init_flag)
@@ -679,6 +766,13 @@ namespace Material_slots
 		return material_id;
 	}
 	
+	/// <summary>
+	/// Returns the material properties for the given material ID.
+	/// </summary>
+	/// <param name="material_id">[in] ID of the material to retrieve.</param>
+	/// <returns>
+	/// Material properties if found; otherwise an empty material_properties.
+	/// </returns>
 	material_properties get_material(const unsigned int material_id)
 	{
 		if (!init_flag)
@@ -699,6 +793,11 @@ namespace Material_slots
 		return {};
 	}
 
+	/// <summary>
+	///		Gets the index of the bound material slot for a given material ID.
+	/// </summary>
+	/// <param name="material_id">[in] ID of the material to find the slot for.</param>
+	/// <returns>Index of the bound material slot if found, -1 otherwise.</returns>
 	int get_index_of_bound_slot(const unsigned int material_id)
 	{
 		if(material_id <= 0)
@@ -714,6 +813,10 @@ namespace Material_slots
 		return -1;
 	}
 
+	/// <summary>
+	///		Unbinds a material from a slot and resets its tracking info.
+	/// </summary>
+	/// <param name="slot_index">[in] Index of the material slot to unbind.</param>
 	void unbound_material(const int slot_index)
 	{
 		if (slot_index >= 0 && slot_index < MAX_MATERIALS)
@@ -727,6 +830,12 @@ namespace Material_slots
 		}
 	}
 
+	/// <summary>
+	///		Binds a material to a free slot or replaces the oldest if full.
+	///		Updates the UBO with the material properties.
+	/// </summary>
+	/// <param name="material_id">[in] ID of the material to bind.</param>
+	/// <returns>Index of the slot the material was bound to, or -1 on error.</returns>
 	int bound_material(const unsigned int material_id)
 	{
 		if(!init_flag)
@@ -804,6 +913,7 @@ namespace Event_management
 	using Event_receiver_weak = std::weak_ptr<std::function<void(const Event&)>>;
 
 	template<typename T>
+
 	Event_receiver_shared make_receiver(T&& lambda)
 	{
 		return std::make_shared<std::function<void(const Event&)>>(std::forward<T>(lambda));
@@ -824,11 +934,24 @@ namespace Event_management
 
 		bool is_alive = true;
 
+		/// <summary>
+		///		Event constructor. Sets the event timing and type. 
+		///		For targeted events, use the other constructor that also takes a target receiver and sets the scope to Targeted.
+		/// </summary>
+		/// <param name="timing">[in] Timing of the event (Immediate or Queued).</param>
+		/// <param name="type">[in] Type of the event.</param>
 		Event(const Event_timing timing, const Event_type type)
 		{
 			this->timing = timing;
 			this->type = type;
 		}
+
+		/// <summary>
+		///		Event constructor for targeted events. Sets the timing, target receiver, scope to Targeted, and event type.
+		/// </summary>
+		/// <param name="timing">[in] Timing of the event (Immediate or Queued).</param>
+		/// <param name="target_receiver">[in] The target receiver for this event.</param>
+		/// <param name="type">[in] Type of the event.</param>
 		Event(const Event_timing timing, const Event_receiver_shared& target_receiver, const Event_type type)
 		{
 			this->timing = timing;
