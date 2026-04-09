@@ -464,7 +464,7 @@ namespace Texture_slots {
 	///		Finds the last empty texture slot for binding a new texture.
 	/// </summary>
 	/// <returns>[out] Index of the last empty slot, or -1 if none found.</returns>
-	int get_last_empty_space() // slot 0 genellikle dolu olduðu için sondan aranýr
+	int get_last_empty_space() //because slot 0 is mostly used during other texture bindings we start searching from last slot
 	{
 		for (int i = TEXTURE_SLOTS - 1; i >= 0; --i) {
 			if (bound_slots[i] <= 0) {
@@ -599,6 +599,7 @@ namespace Material_slots
 	unsigned int bound_materials[MAX_MATERIALS] = { 0 }; // to keep track of deleted materials for reuse of UBO slots
 	unsigned int slot_age[MAX_MATERIALS] = { 0 };//to track usage age of slots for replacement if needed
 
+	int ubo_slot = -1;//to keep track of which UBO slot is used for material UBO, used for binding in shaders
 
 	void init_material_slots()
 	{
