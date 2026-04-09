@@ -10,6 +10,7 @@ uniform vec3 viewPos;
 uniform int TEX_COUNTS[];
 
 uniform sampler2D DIFFUSE[MAX_TEX_PER_TYPE];
+uniform sampler2D NORMAL[MAX_TEX_PER_TYPE];
 uniform sampler2D SPECULAR[MAX_TEX_PER_TYPE];
 
 uniform int material_index;
@@ -59,6 +60,7 @@ void main()
      vec3 diff_map_val = vec3(0,0,0);
      vec3 spec_val = vec3(0,0,0);
      float shininess = 0;
+     vec3 normal_map_val = vec3(0,0,0); 
 
     for(int i=0; i<TEX_COUNTS[0];i++)
     {
@@ -67,18 +69,23 @@ void main()
 
     for(int i=0; i<TEX_COUNTS[1];i++)
     {
-        spec_val += vec3(texture(SPECULAR[i], TexCoord) / float(TEX_COUNTS[1]));
+        normal_map_val += vec3(texture(NORMAL[i], TexCoord) / float(TEX_COUNTS[1]));
+    }
+    
+    for(int i=0; i<TEX_COUNTS[2];i++)
+    {
+        spec_val += vec3(texture(SPECULAR[i], TexCoord) / float(TEX_COUNTS[2]));
     }
 
     if(material_index >= 0 && material_index < MAX_MATERIALS)
     {
         Material material = materials[material_index];
         diff_map_val = TEX_COUNTS[0]>0 ? diff_map_val * material.diffuse : material.diffuse;
-        spec_val = TEX_COUNTS[1]>0 ? spec_val * material.specular : material.specular;
+        spec_val = TEX_COUNTS[2]>0 ? spec_val * material.specular : material.specular;
         shininess = material.shininess;
     }
     
-	vec3 norm = normalize(Normal);
+	vec3 norm = TEX_COUNTS[1]>0 ? normalize(normal_map_val) : normalize(Normal);
     vec3 total_light = vec3(0.0, 0.0, 0.0);
 
     for(int i = 0; i < min(num_of_lights,16); i++)
