@@ -96,6 +96,11 @@ public:
     }
     // adding geometry shader is optional
     // ------------------------------------------------------------------------
+
+    /// <summary 
+    ///		Adds a geometry shader to the existing shader program. Compiles the shader and links it to the program.
+    /// </summary>
+    /// <param name="geometryPath">[in] Path to the geometry shader file.</param>
     void add_geometry_shader(const char* geometryPath)
     {
         std::string geoCode;
@@ -154,6 +159,11 @@ public:
 	}
     // activate the shader
     // ------------------------------------------------------------------------
+
+    /// <summary>
+	///     Activates the shader program for use. 
+    ///     Sets the current_shader_id to this shader's ID and calls glUseProgram.
+    /// </summary>
     void use()
     {
         current_shader_id = ID;
@@ -161,6 +171,12 @@ public:
     }
     // utility uniform functions
     // ------------------------------------------------------------------------
+
+    /// <summary>
+    ///		Sets a boolean uniform variable in the shader program.
+    /// </summary>
+    /// <param name="name">[in] The name of the uniform variable.</param>
+    /// <param name="value">[in] The boolean value to set.</param>
     void setBool(const std::string& name, bool value)
     {
         if (current_shader_id != ID)
@@ -173,6 +189,12 @@ public:
         glUniform1i(uniform_locations[name], (int)value);
     }
     // ------------------------------------------------------------------------
+
+    /// <summary>
+    ///		Sets an integer uniform variable in the shader program.
+    /// </summary>
+    /// <param name="name">[in] The name of the uniform variable.</param>
+    /// <param name="value">[in] The integer value to set.</param>
     void setInt(const std::string& name, int value) 
     {
         if (current_shader_id != ID)
@@ -185,6 +207,14 @@ public:
         glUniform1i(uniform_locations[name], value);
     }
     // ------------------------------------------------------------------------
+
+/// <summary>
+///		Sets an integer array uniform variable in the shader program.
+///		The 'amount' parameter specifies how many integers are in the array.
+/// </summary>
+/// <param name="name">[in] The name of the uniform variable.</param>
+/// <param name="value">[in] The array of integer values to set.</param>
+/// <param name="amount">[in] The number of integers in the array.</param>
     void setInt(const std::string& name, int value[], int amount)
     {
         if (current_shader_id != ID)
@@ -197,6 +227,12 @@ public:
         glUniform1iv(uniform_locations[name], amount, value);
     }
     // ------------------------------------------------------------------------
+
+    /// <summary>
+    ///		Sets a float uniform variable in the shader program.
+    /// </summary>
+    /// <param name="name">[in] The name of the uniform variable.</param>
+    /// <param name="value">[in] The float value to set.</param>
     void setFloat(const std::string& name, float value)
     {
         if (current_shader_id != ID)
@@ -209,6 +245,13 @@ public:
         glUniform1f(uniform_locations[name], value);
     }
     // ------------------------------------------------------------------------
+
+    /// <summary>
+    ///		Sets a float array uniform variable in the shader program.
+    /// </summary>
+    /// <param name="name">[in] The name of the uniform variable.</param>
+    /// <param name="value">[in] The array of float values to set.</param>
+    /// <param name="amount">[in] The number of floats in the array.</param>
     void setFloat(const std::string& name, float value[], int amount)
     {
         if (current_shader_id != ID)
@@ -221,6 +264,13 @@ public:
         glUniform1fv(uniform_locations[name], amount, value);
     }
     // ------------------------------------------------------------------------
+
+    /// <summary>
+    ///		Sets a 4x4 float matrix uniform variable in the shader program.
+    ///		The 'value' parameter should point to an array of 16 floats in column-major order.
+    /// </summary>
+    /// <param name="name">[in] The name of the uniform variable.</param>
+    /// <param name="value">[in] Pointer to an array of 16 floats representing the matrix.</param>
     void setMatrix4fv(const std::string& name, const float* value)
     {
         if (current_shader_id != ID)
@@ -233,6 +283,12 @@ public:
         glUniformMatrix4fv(uniform_locations[name], 1, GL_FALSE, value);
     }
     // ------------------------------------------------------------------------
+
+    /// <summary>
+    ///		Sets a vec4 uniform variable in the shader program using a glm::vec4.
+    /// </summary>
+    /// <param name="name">[in] The name of the uniform variable.</param>
+    /// <param name="value">[in] The glm::vec4 value to set.</param>
     void setVec4(const std::string& name, const glm::vec4& value)
     {
         if (current_shader_id != ID)
@@ -244,7 +300,6 @@ public:
         }
         glUniform4fv(uniform_locations[name], 1, glm::value_ptr(value));
     }
-    // ------------------------------------------------------------------------
     void setVec4(const std::string& name, const glm::vec4 value[], int amount)
     {
         if (current_shader_id != ID)
@@ -257,6 +312,12 @@ public:
         glUniform4fv(uniform_locations[name], amount, glm::value_ptr(value[0]));
     }
     // ------------------------------------------------------------------------
+
+    /// <summary>
+    ///     Sets a vec3 uniform variable in the shader program using a glm::vec3.
+    /// </summary>
+    /// <param name="name">[in] The name of the uniform variable.</param>
+    /// <param name="value">[in] The glm::vec3 value to set.</param>
     void setVec3(const std::string& name, const glm::vec3& value)
     {
         if (current_shader_id != ID)
@@ -272,6 +333,12 @@ public:
 private:
     // utility function for checking shader compilation/linking errors.
     // ------------------------------------------------------------------------
+
+    /// <summary>
+    ///     Checks for shader compilation or program linking errors and logs them using the Logger.
+    /// </summary>
+    /// <param name="shader">[in] The shader or program ID to check.</param>
+    /// <param name="type">[in] The type of shader or program ("VERTEX", "FRAGMENT", "PROGRAM", etc.).</param>
     void checkCompileErrors(unsigned int shader, std::string type)
     {
         int success;
