@@ -77,10 +77,10 @@ public:
         
         
         //This part makes every shader to use our Materials UBO that defined at globals,
-        GLuint blockIndex = glGetUniformBlockIndex(ID, "Materials");
+        GLuint blockIndex = glGetUniformBlockIndex(ID, "Material_block");
         if(blockIndex == GL_INVALID_INDEX)
         {
-            LOG_INFO("Shader with id: %d dont have a Materials block, skipping material UBO Binding");
+            LOG_INFO("Shader with id: %d dont have a Material block, skipping material UBO Binding");
 		}
         else
         {
@@ -88,10 +88,10 @@ public:
             {
                 Material_slots::init_material_slots();
 		    }
-            glUniformBlockBinding(ID, blockIndex, MATERIAL_UBO_BINDING);
+            glUniformBlockBinding(ID, blockIndex, Material_slots::ubo_slot);
             Logger::checkGLError("after adding Material ubo");
         }
-        
+
 
     }
     // adding geometry shader is optional
@@ -135,6 +135,23 @@ public:
 
         glDeleteShader(geometry);
     }
+	// this function lets you bind UBO's to shader that don crated at init
+    // ------------------------------------------------------------------------
+    int bind_UBO(const char* block_name, unsigned int UBO_Slot)
+    {
+        GLuint blockIndex = glGetUniformBlockIndex(ID, block_name);
+        if (blockIndex == GL_INVALID_INDEX)
+        {
+            LOG_ERROR("Shader with id: %d dont have a block named: %s", ID, block_name);
+            return -1;
+        }
+        else
+        {
+            glUniformBlockBinding(ID, blockIndex, UBO_Slot);
+            Logger::checkGLError("after adding ubo:");
+            return 0;
+        }
+	}
     // activate the shader
     // ------------------------------------------------------------------------
     void use()
@@ -227,6 +244,7 @@ public:
         }
         glUniform4fv(uniform_locations[name], 1, glm::value_ptr(value));
     }
+    // ------------------------------------------------------------------------
     void setVec4(const std::string& name, const glm::vec4 value[], int amount)
     {
         if (current_shader_id != ID)

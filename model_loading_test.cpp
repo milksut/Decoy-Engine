@@ -21,10 +21,10 @@ const float aspect_ratio = (float)width / (float)height;
 Event_manager manager;
 Input_Manager* input_manager;
 
-camera_test camera(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 0.0f));
+
 
 TextRenderer* printer;
-
+camera_test* camera;
 void framebuffer_size_callback(GLFWwindow* window, int width, int height)
 {
 	//// make sure the viewport matches the new window dimensions; note that width and 
@@ -44,12 +44,12 @@ void framebuffer_size_callback(GLFWwindow* window, int width, int height)
 	//}
 	glViewport(0, 0, width, height);
 
-	camera.update_projection(45.0f, new_aspect_ratio, 0.1f, 1000.0f);
+	camera->update_projection(45.0f, new_aspect_ratio, 0.1f, 1000.0f);
 	printer->change_screen_size(width, height);
 }
 
 bool pressable = true;
-void processInput(GLFWwindow* window, float camera_speed, camera_test& camera)
+void processInput(GLFWwindow* window, float camera_speed, camera_test* camera)
 {
 
 	if (glfwGetKey(window, GLFW_KEY_F11) == GLFW_PRESS && pressable)
@@ -115,11 +115,11 @@ void processInput(GLFWwindow* window, float camera_speed, camera_test& camera)
 
 	if (glfwGetKey(window, GLFW_KEY_Q) == GLFW_PRESS)
 	{
-		camera.camera_tilt(-camera_speed * 5);
+		camera->camera_tilt(-camera_speed * 5);
 	}
 	if (glfwGetKey(window, GLFW_KEY_E) == GLFW_PRESS)
 	{
-		camera.camera_tilt(camera_speed * 5);
+		camera->camera_tilt(camera_speed * 5);
 	}
 
 	if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
@@ -131,7 +131,7 @@ void processInput(GLFWwindow* window, float camera_speed, camera_test& camera)
 	{
 		glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 	}
-	camera.camera_move(
+	camera->camera_move(
 		1, camera_speed,
 		changes[0], changes[1],
 		changes[2], changes[3],
@@ -149,8 +149,8 @@ int main()
 	}
 
 	glfwSwapInterval(enable_vSync);
-
-	camera.update_projection(45.0f, aspect_ratio, 0.1f, 1000.0f);
+	camera = new camera_test(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 0.0f));
+	camera->update_projection(45.0f, aspect_ratio, 0.1f, 1000.0f);
 
 	printer = new TextRenderer("Textures/Font_texture_Atlas/DejaVu Sans Mono_512X256_16x32.png",
 		"Textures/Font_texture_Atlas/DejaVu Sans Mono_512X256_16x32.txt",
@@ -250,7 +250,7 @@ int main()
 		if (e.type == Event_type::Mouse_moved)
 		{
 			const auto& mouse = dynamic_cast<const Mouse_move_event&>(e);
-			camera.process_mouse_movement(mouse.mouse_x_offset, mouse.mouse_y_offset,
+			camera->process_mouse_movement(mouse.mouse_x_offset, mouse.mouse_y_offset,
 				input_manager->mouse_sensitivity);
 			const_cast<Mouse_move_event&>(mouse).is_alive = false;
 		}
@@ -352,11 +352,14 @@ int main()
 
 	glEnable(GL_DEPTH_TEST); // Enable depth testing for 3D rendering
 	glEnable(GL_CULL_FACE); // Enable face culling to improve performance
+	//glCullFace(GL_FRONT_AND_BACK);
 	glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 	int x = 0, y = 0, z = 0;
 	double time_of_last_frame = 1;
 	std::string fps_text = "";
 	glfwSetTime(0.0);
+
+	shader.bind_UBO("projectionXview_block",camera->Ubo_slot);
 
 	while (!glfwWindowShouldClose(window))
 	{
@@ -368,11 +371,8 @@ int main()
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 		shader.use();
-		shader.setVec3("viewPos", camera.camera_position);
-		shader.setMatrix4fv("view", glm::value_ptr(camera.view));
-		shader.setMatrix4fv("projection", glm::value_ptr(camera.projection));
-
-
+		shader.setVec3("viewPos", camera->camera_position);
+		
 		backpack.draw(shader, grid_region, grid_amount * grid_amount);
 		Logger::checkGLError("After drawing grid backpack");
 

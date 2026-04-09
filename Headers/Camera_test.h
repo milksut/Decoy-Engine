@@ -49,7 +49,8 @@ private:
 		update_view_matrix();
 	}
 
-
+	unsigned int Camera_UBO;
+	
 public:
 	glm::vec3 camera_right;
 	glm::vec3 camera_position;
@@ -63,13 +64,24 @@ public:
 	glm::mat4 projection;
 	glm::mat4 view;
 
+	int Ubo_slot = -1;
 	camera_test(
 		glm::vec3 position = glm::vec3(0.0f, 0.0f, 3.0f),
 		glm::vec3 camera_angles = glm::vec3(0.0f, 0.0f, 0.0f),
 		glm::vec3 world_up = glm::vec3(0.0f, 1.0f, 0.0f))
 		: camera_position(position), camera_angles(camera_angles), world_up(world_up)
 	{
-		update_camera_vectors(true,true,true);
+		glGenBuffers(1, &Camera_UBO);
+		glBindBuffer(GL_UNIFORM_BUFFER, Camera_UBO);
+		glBufferData(GL_UNIFORM_BUFFER,
+			sizeof(glm::mat4), glm::value_ptr(projection*view), GL_DYNAMIC_DRAW);
+		
+		Ubo_slot = Ubo_slots::get_first_empty_slot();
+		Ubo_slots::bind_ubo_to_slot(Camera_UBO, Ubo_slot);
+
+		LOG_INFO("UBO initialized. Camera UBO: %d bytes", sizeof(glm::mat4));
+		
+		update_camera_vectors(true, true, true);
 		update_projection();
 		update_view_matrix();
 	}
@@ -87,6 +99,8 @@ public:
 		float near_plane = 0.1f, float far_plane = 100.0f)
 	{
 		projection = glm::perspective(glm::radians(fov), aspect_ratio, near_plane, far_plane);
+		glBindBuffer(GL_UNIFORM_BUFFER, Camera_UBO);
+		glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(glm::mat4), glm::value_ptr(projection * view));
 	}
 
 	bool flip = false;
@@ -217,6 +231,8 @@ public:
 	void update_view_matrix()
 	{
 		view = glm::lookAt(camera_position, camera_position + camera_front, camera_up);
+		glBindBuffer(GL_UNIFORM_BUFFER, Camera_UBO);
+		glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(glm::mat4), glm::value_ptr(projection * view));
 	}
 };
 

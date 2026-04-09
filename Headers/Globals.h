@@ -9,7 +9,7 @@
 #define OPENGL_VERSION_MAJOR 3
 #define OPENGL_VERSION_MINOR 3
 
-#define MATERIAL_UBO_BINDING  0  // binding point 0 = materials
+#define MAX_UBO_BINDING_POINTS 16 //OpenGL guarantees at least 16 uniform buffer binding points, so we can safely use binding points from 0 to 15
 #define MAX_MATERIALS        128  // max materials in UBO array, can be increased if needed, but keep in mind that UBOs have size limits (usually around 64KB)
 //end of defines---------------------------------------------------------------------------------
 
@@ -486,6 +486,35 @@ namespace Texture_slots {
 
 }
 
+namespace Ubo_slots
+{
+	//TODO: CREATE A MANGAMENT sytem later, for now this just gives slot id and dont change anything
+
+	unsigned int bound_slots[MAX_UBO_BINDING_POINTS] = { 0 };
+
+	int get_first_empty_slot()
+	{
+		for (int i = 0; i < MAX_UBO_BINDING_POINTS; i++) {
+			if (bound_slots[i] <= 0) {
+				return i;
+			}
+		}
+		return -1;
+	}
+	void bind_ubo_to_slot(unsigned int ubo_id, int slot_index)
+	{
+		if (slot_index >= 0 && slot_index < MAX_UBO_BINDING_POINTS)
+		{
+			glBindBufferBase(GL_UNIFORM_BUFFER, slot_index, ubo_id);
+			bound_slots[slot_index] = ubo_id;
+		}
+		else
+		{
+			LOG_ERROR("Invalid UBO slot index %d! Must be between 0 and %d.", slot_index, MAX_UBO_BINDING_POINTS - 1);
+		}
+	}
+}
+
 namespace Material_slots
 {
 
@@ -513,6 +542,8 @@ namespace Material_slots
 	unsigned int bound_materials[MAX_MATERIALS] = { 0 }; // to keep track of deleted materials for reuse of UBO slots
 	unsigned int slot_age[MAX_MATERIALS] = { 0 };//to track usage age of slots for replacement if needed
 
+	int ubo_slot = -1;//to keep track of which UBO slot is used for material UBO, used for binding in shaders
+
 
 	void init_material_slots()
 	{
@@ -527,7 +558,14 @@ namespace Material_slots
 		glBufferData(GL_UNIFORM_BUFFER,
 			MAX_MATERIALS * sizeof(material_properties),
 			nullptr, GL_DYNAMIC_DRAW);
-		glBindBufferBase(GL_UNIFORM_BUFFER, MATERIAL_UBO_BINDING, material_ubo);
+
+		ubo_slot = Ubo_slots::get_first_empty_slot();
+		if(ubo_slot == -1)
+		{
+			LOG_FATAL("No available UBO slots to bind material UBO! Material UBO will not be bound.");
+			return;
+		}
+		Ubo_slots::bind_ubo_to_slot(material_ubo, ubo_slot);
 
 		glBindBuffer(GL_UNIFORM_BUFFER, 0);
 
@@ -723,7 +761,6 @@ namespace Material_slots
 		glBindBuffer(GL_UNIFORM_BUFFER, material_ubo);
 		glBufferSubData(GL_UNIFORM_BUFFER, slot_index * sizeof(material_properties), sizeof(material_properties),
 			&materials[material_wrapper_index(material_id)].mat_props);
-		glBindBuffer(GL_UNIFORM_BUFFER, 0);
 
 		LOG_INFO("Bound material with ID %d to slot %d", material_id, slot_index);
 		return slot_index;

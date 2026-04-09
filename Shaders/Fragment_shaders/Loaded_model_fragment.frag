@@ -28,7 +28,7 @@ struct Material
 	    vec3 emission;//object emits light		
 	    float illumination_model;//illumination model used by the material 
     };
-layout(std140) uniform Materials
+layout(std140) uniform Material_block
 {
     Material materials[MAX_MATERIALS];
 };

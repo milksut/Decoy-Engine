@@ -78,7 +78,6 @@ private:
 				
 			}
 
-			glActiveTexture(GL_TEXTURE0);
 			if (!Material_slots::init_flag)
 			{
 				Material_slots::init_material_slots();
