@@ -1,4 +1,4 @@
-# OpenGl-GLFW denek
+# Decoy-Engine
 **Gerekli kütüphaneler**
 
 - Stb_image -> Görselleri (PNG, JPG vb.) kolayca yüklemek için
