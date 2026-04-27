@@ -16,6 +16,11 @@
 class Input_Manager
 {
 private:
+    /// <summary>
+    ///     Processes mouse movement input and dispatches a corresponding event.
+    /// </summary>
+    /// <param name="x_pos">[in] Current mouse x position.</param>
+    /// <param name="y_pos">[in] Current mouse y position.</param>
     void mouse_move_callback(double x_pos, double y_pos)
     {
         const double mouse_x_offset = (x_pos - mouse_x) * mouse_sensitivity;
@@ -28,6 +33,11 @@ private:
             mouse_x_offset, mouse_y_offset));
     }
 
+    /// <summary>
+    ///     Processes mouse scroll input and dispatches a corresponding event.
+    /// </summary>
+    /// <param name="x_offset">[in] Scroll offset on the x-axis.</param>
+    /// <param name="y_offset">[in] Scroll offset on the y-axis.</param>
     void mouse_scroll_callback(double x_offset, double y_offset)
     {
         event_manager.throw_event("Mouse_input",
@@ -46,7 +56,11 @@ public:
     double mouse_x = 0, mouse_y = 0, mouse_sensitivity = 1;  
     GLFWwindow* window;
 
-    ///width and height only used for starting mouse positon
+    /// <summary>
+    ///     Initializes the input manager, sets up event channels and registers GLFW input callbacks. Width and height only used for starting mouse position.
+    /// </summary>
+    /// <param name="event_manager">[in] Reference to the event manager used for input events.</param>
+    /// <param name="window">[in] Pointer to the GLFW window used for input callbacks.</param>
     Input_Manager(Event_manager& event_manager, GLFWwindow* window)
         : event_manager(event_manager), window(window)
     {
@@ -72,6 +86,11 @@ public:
         });
     }
 
+    /// <summary>
+    ///     Returns the current state of the specified input key (keyboard or mouse).
+    /// </summary>
+    /// <param name="key">[in] The input key to query.</param>
+    /// <returns>Current state of the key, or Idle if the input type is unknown.</returns>
     Key_state Get_key_state(Input_key key) const
     {
         if (key.type == Keyboard_input) return Keyboard_buttons[key.code];
@@ -85,6 +104,10 @@ public:
     }
 	//TODO: Add a function to get combo state, Probably not needed though,
 
+    /// <summary>
+    ///     Registers a new input key combo if it is not already registered.
+    /// </summary>
+    /// <param name="keys">[in] List of keys that form the combo.</param>
     void register_combo(const std::vector<Input_key>& keys)
     {
         //i am not sure if this okey, it's slow, but how often do you add combos any way?
@@ -94,6 +117,9 @@ public:
 		registered_combos.push_back({ Key_combo{keys}, Idle });
 	}
 
+    /// <summary>
+    ///     Polls keyboard, mouse, and registered combo inputs and dispatches corresponding input events.
+    /// </summary>
     void Poll_keys()
     {
         // Poll keyboard keys explicitly
@@ -189,6 +215,12 @@ public:
         }
     }
 
+    /// <summary>
+    ///     Subscribes a receiver to a specific input channel and event type.
+    /// </summary>
+    /// <param name="channel">[in] Input channel to subscribe to.</param>
+    /// <param name="event_type">[in] Type of event to listen for.</param>
+    /// <param name="receiver">[in] Event receiver to be notified.</param>
     void subscribe(Input_channel channel, const Event_type event_type, const Event_receiver_shared& receiver)
     {
 		event_manager.subscribe(Input_channel_names[channel], event_type, receiver);

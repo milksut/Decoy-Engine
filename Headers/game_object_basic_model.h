@@ -11,6 +11,9 @@
 #include <assimp/scene.h>
 #include <assimp/postprocess.h>
 
+/// <summary>
+///     Maps internal texture types to Assimp texture types for import processing.
+/// </summary>
 static const aiTextureType Assimp_Tex_Types[] =
 {
 	#define X(name,assimp_name, second_assimp_name) assimp_name,
@@ -18,6 +21,9 @@ static const aiTextureType Assimp_Tex_Types[] =
 	#undef X
 };
 
+/// <summary>
+///     Maps internal texture types to secondary Assimp texture type variants.
+/// </summary>
 static const aiTextureType Assimp_Tex_Types_2[] =
 {
 	#define X(name,assimp_name, second_assimp_name) second_assimp_name,
@@ -49,6 +55,10 @@ private:
 
 		bool can_override_vbo = false;
 
+		/// <summary>
+		///     Binds all mesh textures and material data to the shader as sampler arrays and uniforms.
+		/// </summary>
+		/// <param name="shader">[in] Shader used for texture and material binding.</param>
 		void bind_textures(Shader& shader)
 		{
 			//these are sent as uniforms to shader as sampler 2d arrays like TEXTURE[], DIFFUSE[] etc. What name is defined in globals.h
@@ -96,6 +106,10 @@ private:
 
 		}
 		
+		/// <summary>
+		///     Deletes an instance buffer and disables its vertex attributes.
+		/// </summary>
+		/// <param name="attrib_index">[in] Attribute index of the instance buffer.</param>
 		void delete_instance_buffer(int attrib_index)
 		{
 			if (attrib_index >= VAO_MAX_ATTRIB_AMOUNT || attrib_index <= 2)
@@ -121,6 +135,9 @@ private:
 			glBindVertexArray(0);
 		}
 
+		/// <summary>
+		///     Calculates and assigns the offset position for each class region in number space.
+		/// </summary>
 		void calc_offset_in_number()
 		{
 			int offset = 0;
@@ -143,6 +160,12 @@ private:
 
 		unsigned int VAO, VBO_Mesh, EBO;
 
+		/// <summary>
+		///     Constructs a mesh and uploads vertex, index, and texture data to GPU buffers.
+		/// </summary>
+		/// <param name="vertices">[in] Vertex data of the mesh.</param>
+		/// <param name="indices">[in] Index data of the mesh.</param>
+		/// <param name="textures">[in] Textures associated with the mesh.</param>
 		Mesh(const std::vector<vertex_data> &vertices,const std::vector<unsigned int> &indices,const std::vector<Texture>& textures)
 			:instance_attributes(VAO_MAX_ATTRIB_AMOUNT, empty_attrib), main_vertices(vertices), main_indices(indices), main_textures(textures)
 		{
@@ -192,6 +215,12 @@ private:
 			glBindVertexArray(0);
 		}
 
+		/// <summary>
+		///     Destructor that releases all GPU resources used by the mesh.
+		/// </summary>
+		/// <remarks>
+		///     Deletes VBO, EBO, VAO, instance buffers, and clears texture and region data.
+		/// </remarks>
 		~Mesh()
 		{
 			glDeleteBuffers(1, &VBO_Mesh);
@@ -212,6 +241,14 @@ private:
 
 		///this function is dangerous! don't use if you don't know what you are doing
 		///this function needs to be refactored, dont depend on it. //TODO:
+	
+		/// <summary>
+		///     Updates mesh vertex, index, and texture data on the GPU.
+		/// </summary>
+		/// <param name="vertices">[in] New vertex data for the mesh.</param>
+		/// <param name="indices">[in] New index data for the mesh.</param>
+		/// <param name="textures">[in] New textures associated with the mesh.</param>
+		/// <param name="use_dynamic_draw">[in] If true, uses dynamic draw for buffer updates.</param>
 		void update_mesh(const std::vector<vertex_data> &vertices,const std::vector<unsigned int> &indices,
 			const std::vector<Texture>& textures, bool use_dynamic_draw = false)
 		{
@@ -259,6 +296,11 @@ private:
 
 		Mesh& operator=(const Mesh&) = delete;// Delete copy assignment operator
 
+		/// <summary>
+		///     Creates and reserves a new class region in instance data storage.
+		/// </summary>
+		/// <param name="size_in_number">[in] Size of the region in number of elements.</param>
+		/// <returns>Shared pointer to the created class region.</returns>
 		std::shared_ptr<class_region> reserve_class_region(int size_in_number)
 		{
 			std::shared_ptr<class_region> region = std::make_shared<class_region>();
@@ -281,6 +323,11 @@ private:
 			return region;
 		}
 
+		/// <summary>
+		///     Expands an existing class region and updates instance buffer layout.
+		/// </summary>
+		/// <param name="size_in_number">[in] New size of the region in number of elements.</param>
+		/// <param name="region">[in] Region to be resized.</param>
 		void reserve_additional_region(int size_in_number, std::shared_ptr<class_region> region)
 		{
 			region->size_in_number = size_in_number;
@@ -296,6 +343,10 @@ private:
 			}
 		}
 
+		/// <summary>
+		///     Adds a new class region and updates instance buffer layout.
+		/// </summary>
+		/// <param name="region">[in] Region to be added.</param>
 		void add_class_region(std::shared_ptr<class_region> region)
 		{
 			shared_regions.push_back(region);
@@ -311,6 +362,10 @@ private:
 			}
 		}
 
+		/// <summary>
+		///     Uploads all class region data for a specific vertex attribute to the GPU buffer.
+		/// </summary>
+		/// <param name="attrib_index">[in] Attribute index whose region data will be uploaded.</param>
 		void load_all_regions_for_attribute(int attrib_index)
 		{
 			if (attrib_index >= VAO_MAX_ATTRIB_AMOUNT || attrib_index <= 2)
@@ -343,13 +398,18 @@ private:
 		
 		//add instance buffer for instanced rendering
 
-		///use this function to add extra per-instance attributes like colors,model matrices etc.
-		///it will crate a buffer of given size for every class_region known to this mesh
-		///this function only crates buffers, to load data use function load_instance_buffer
-		///most of the time you have max of 16 attrib indexs per vao, 0-1-2 are used by mesh,
-		///You can have 4 attribs(floats) per index, after 4 it crates another index
-		///you should have enough vectors for amount you wanna draw,
-		///if you have more no problem, if you have less than you get undefined behevior
+		/// <summary>
+		///     Creates an instance buffer for per-instance vertex attributes (e.g. colors, model matrices).
+		///     This function only allocates GPU buffers for each known class region; it does not upload data.
+		///     Use load_instance_buffer / load_all_regions_for_attribute to fill the buffer after creation.
+		///     Most VAOs support ~16 attribute slots (0–2 reserved for mesh data). Each slot can store up to 4 floats.
+		///     If more is needed, multiple attribute indices are used.
+		///     Ensure sufficient vector capacity for all instance data; otherwise undefined behavior may occur.
+		/// </summary>
+		/// <param name="attrib_size">[in] Size of the attribute in floats.</param>
+		/// <param name="attrib_index">[in] Starting attribute index in the VAO.</param>
+		/// <param name="loop_instance">[in] Instance divisor (default = 1).</param>
+		/// <returns>0 on success, -1 on failure.</returns>
 		int add_instance_buffer(int attrib_size, int attrib_index, int loop_instance = 1)
 		{
 			if(shared_regions.empty())
@@ -393,6 +453,13 @@ private:
 			return 0;
 		}
 
+		/// <summary>
+		///     Recreates an instance buffer by temporarily allowing buffer override.
+		/// </summary>
+		/// <param name="attrib_size">[in] Size of the attribute in floats.</param>
+		/// <param name="attrib_index">[in] Starting attribute index in the VAO.</param>
+		/// <param name="loop_instance">[in] Instance divisor (default = 1).</param>
+		/// <returns>Result of buffer creation (0 on success, -1 on failure).</returns>
 		int override_instance_buffer(int attrib_size, int attrib_index, int loop_instance = 1)
 		{
 			can_override_vbo = true;
@@ -402,14 +469,17 @@ private:
 		}
 
 		/// <summary>
-		/// this function used to load data to previously created instance buffer using add_instance_buffer function
-		/// it overwrites the data at point
+		///     Loads (overwrites) data into an existing instance buffer at a specific region offset.
 		/// </summary>
-		/// <param name="data"> - the float[] keeping the data, can use vector.data()</param>
-		/// <param name="amount_in_attrib_size"> - how many of that attrbiute is in this data, shape dont matter if you load 4 mat4 then write 4</param>
-		/// <param name="attrib_index"> - which attrib you are writing to</param>
-		/// <param name="region"> - your class_region, if you dont have one, get using resere_class_region</param>
-		/// <param name="data_offset_by_attrib_size"> - if you want to change a spesfic place, it starts after that attribute</param>
+		/// <remarks>
+		///     Use after add_instance_buffer / reserve_class_region.
+		///     Data is written using glBufferSubData and replaces existing GPU memory.
+		/// </remarks>
+		/// <param name="data">[in] Pointer to float data (e.g. vector.data()).</param>
+		/// <param name="amount_in_attrib_size">[in] Number of attribute units to write.</param>
+		/// <param name="attrib_index">[in] Attribute index to write into.</param>
+		/// <param name="region">[in] Class region describing memory layout.</param>
+		/// <param name="data_offset_by_attrib_size">[in] Offset in attribute units (default = 0).</param>
 		void load_instance_buffer(float* data, unsigned int amount_in_attrib_size, int attrib_index,
 			std::shared_ptr<class_region> region, float data_offset_by_attrib_size = 0)
 		{
@@ -429,6 +499,15 @@ private:
 			glBindBuffer(GL_ARRAY_BUFFER, 0);
 		}
 
+		/// <summary>
+		///     Draws the mesh using instanced rendering with bound textures and instance attributes.
+		/// </summary>
+		/// <remarks>
+		///     Rebinds attribute offsets when the active class region changes and issues instanced draw calls.
+		/// </remarks>
+		/// <param name="shader">[in] Shader used for rendering.</param>
+		/// <param name="region">[in] Active class region for instance data layout.</param>
+		/// <param name="amount">[in] Number of instances to draw (default = 1).</param>
 		void draw(Shader& shader, std::shared_ptr<class_region>& region, int amount = 1)
 		{
 			bind_textures(shader);
@@ -484,6 +563,16 @@ private:
 		std::vector<Mesh_Childs*> Childs;
 	};
 
+	/// <summary>
+	///     Recursively processes an Assimp scene node, extracting meshes and child nodes.
+	/// </summary>
+	/// <remarks>
+	///     Converts Assimp meshes into engine meshes and builds a hierarchical node structure.
+	/// </remarks>
+	/// <param name="node">[in] Current Assimp node being processed.</param>
+	/// <param name="scene">[in] Assimp scene containing mesh data.</param>
+	/// <param name="parent_mesh">[in/out] Parent mesh container for hierarchy construction.</param>
+	/// <param name="path">[in] File path of the loaded model.</param>
 	void process_node(aiNode* node, const aiScene* scene, Mesh_Childs& parent_mesh,const std::string& path)
 	{
 		//process meshes of node
@@ -505,6 +594,16 @@ private:
 		}
 	}
 
+	/// <summary>
+	///     Processes an Assimp mesh into engine mesh data (vertices, indices, textures, materials).
+	/// </summary>
+	/// <remarks>
+	///     Extracts geometry, loads textures, reads material properties, and registers materials if present.
+	/// </remarks>
+	/// <param name="mesh">[in] Assimp mesh to process.</param>
+	/// <param name="scene">[in] Assimp scene containing mesh/material data.</param>
+	/// <param name="path">[in] File path of the model for texture resolution.</param>
+	/// <returns>Shared pointer to the created Mesh.</returns>
 	std::shared_ptr<Mesh> process_mesh(aiMesh* mesh, const aiScene* scene,const std::string& path)
 	{
 		std::vector<vertex_data> vertices;
@@ -647,11 +746,23 @@ public:
 
 	Mesh_Childs root;
 
+	/// <summary>
+	///     Creates a new mesh and adds it to the mesh collection.
+	/// </summary>
+	/// <param name="vertices">[in] Vertex data of the mesh.</param>
+	/// <param name="indices">[in] Index data of the mesh.</param>
+	/// <param name="textures">[in] Textures associated with the mesh.</param>
 	void add_mesh(const std::vector<vertex_data>& vertices,const std::vector<unsigned int>& indices,const std::vector<Texture>& textures)
 	{
 		Meshes.push_back(std::make_shared<Mesh>(vertices, indices, textures));
 	}
 
+	/// <summary>
+	///     Draws all child meshes using the given shader and instance region.
+	/// </summary>
+	/// <param name="shader">[in] Shader used for rendering.</param>
+	/// <param name="region">[in] Instance data region used for drawing.</param>
+	/// <param name="amount">[in] Number of instances to draw per mesh (default = 1).</param>
 	void draw(Shader& shader, std::shared_ptr<class_region>& region, int amount = 1)
 	{
 		for(std::shared_ptr<Mesh> pointer : Meshes)
@@ -660,6 +771,14 @@ public:
 		}
 	}
 
+	/// <summary>
+	///     Reserves a shared class region across all meshes in the object.
+	/// </summary>
+	/// <remarks>
+	///     Creates the region in the first mesh and propagates it to all others.
+	/// </remarks>
+	/// <param name="size_in_number">[in] Size of the region in number of elements.</param>
+	/// <returns>Shared pointer to the created class region.</returns>
 	std::shared_ptr<class_region> reserve_class_region(int size_in_number)
 	{
 		if (Meshes.empty()) {
@@ -677,6 +796,14 @@ public:
 		return region;
 	}
 
+	/// <summary>
+	///     Expands an existing class region across all meshes in the model.
+	/// </summary>
+	/// <remarks>
+	///     Updates region size and propagates the change to each mesh.
+	/// </remarks>
+	/// <param name="size_in_number">[in] New size of the region in number of elements.</param>
+	/// <param name="region">[in] Region to be expanded.</param>
 	void reserve_additional_region(int size_in_number, std::shared_ptr<class_region> region)
 	{
 		for (std::shared_ptr<Mesh> pointer : Meshes)
@@ -685,13 +812,19 @@ public:
 		}
 	}
 
-	///use this function to add extra per-instance attributes like colors,model matrices etc.
-	///this function only crates buffers, to load data use function load_instance_buffer
-	///if you want to expand a previously created buffer, this function clears the area first so load all the data back after this
-	///most of the time you have max of 16 attrib indexs per vao, 0-1-2 are used by mesh,
-	///You can have 4 attribs per index, after 4 it crates another index
-	///you should have enough vectors for amount you wanna draw,
-	///if you have more no problem, if you have less than you get undefined behevior
+	/// <summary>
+	///     Creates per-instance attribute buffers across all meshes (e.g. color, model matrix).
+	/// </summary>
+	/// <remarks>
+	///     Only allocates buffers. Use load_instance_buffer to fill data.
+	///     If expanding existing buffers, data must be reloaded after.
+	///     VAO typically supports ~16 attribute slots (0–2 reserved for mesh data).
+	///     Each slot can hold up to 4 floats; larger data uses multiple slots.
+	///     Ensure sufficient instance data capacity; otherwise undefined behavior may occur.
+	/// </remarks>
+	/// <param name="attrib_size">[in] Size of the attribute in floats.</param>
+	/// <param name="attrib_index">[in] Starting VAO attribute index.</param>
+	/// <param name="loop_instance">[in] Instance divisor (default = 1).</param>
 	void add_instance_buffer(int attrib_size, int attrib_index, int loop_instance = 1)
 	{
 		for (std::shared_ptr<Mesh> pointer : Meshes)
@@ -702,15 +835,18 @@ public:
 
 
 	/// <summary>
-	/// this function used to load data to previously created instance buffer using add_instance_buffer function
-	/// it overwrites the data at point
-	/// this one is for using with all meshes in the model
+	///     Loads (overwrites) instance buffer data across all meshes in the model.
 	/// </summary>
-	/// <param name="data"> - the float[] keeping the data, can use vector.data()</param>
-	/// <param name="amount_in_attrib_size"> - how many of that attrbiute is in this data, shape dont matter if you load 4 mat4 then write 4</param>
-	/// <param name="attrib_index"> - which attrib you are writing to</param>
-	/// <param name="region"> - your class_region, if you dont have one, get using resere_class_region</param>
-	/// <param name="data_offset_by_attrib_size"> - if you want to change a spesfic place, it starts after that attribute</param>
+	/// <remarks>
+	///     Writes into previously created buffers (add_instance_buffer).
+	///     Data is overwritten at the specified region offset.
+	///     Use class_region to define shared memory layout across meshes.
+	/// </remarks>
+	/// <param name="data">[in] Pointer to float data (e.g. vector.data()).</param>
+	/// <param name="amount_in_attrib_size">[in] Number of attribute units to write.</param>
+	/// <param name="attrib_index">[in] Attribute index to write to.</param>
+	/// <param name="region">[in] Class region describing memory layout.</param>
+	/// <param name="data_offset_by_attrib_size">[in] Offset in attribute units (default = 0).</param>
 	void load_instance_buffer(float* data, unsigned int amount_in_attrib_size, int attrib_index,
 		std::shared_ptr<class_region> region, float data_offset_by_attrib_size = 0)
 	{
@@ -720,6 +856,13 @@ public:
 		}
 	}
 
+	/// <summary>
+	///     Imports a 3D model from file using Assimp and builds the mesh hierarchy.
+	/// </summary>
+	/// <remarks>
+	///     Loads scene data, then processes the root node recursively into engine meshes.
+	/// </remarks>
+	/// <param name="path">[in] File path of the model to import.</param>
 	void import_model_from_file(std::string path)
 	{
 		Assimp::Importer importer;

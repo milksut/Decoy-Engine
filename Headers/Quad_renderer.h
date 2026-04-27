@@ -28,12 +28,23 @@ public:
 		:shader(shader)
 	{}
 
+	/// <summary>
+	///     Draws geometry using provided vertex positions and textures.
+	/// </summary>
+	/// <param name="points">[in] Vertex positions for rendering.</param>
+	/// <param name="textures">[in] Textures used for rendering.</param>
 	void draw(const std::vector<std::vector<float>>& points, const std::vector<Texture>& textures)
 	{
 		const std::vector<std::vector<float>> empty;
 		draw(points, textures, empty);
 	}
 
+	/// <summary>
+	///     Renders geometry using vertex positions, optional texture coordinates, and textures.
+	/// </summary>
+	/// <param name="points">[in] Vertex positions for rendering.</param>
+	/// <param name="textures">[in] Textures used for rendering.</param>
+	/// <param name="tex_coord">[in] Optional texture coordinates for vertices.</param>
 	void draw(const std::vector<std::vector<float>> points,const std::vector<Texture>& textures,
 		const std::vector<std::vector<float>>& tex_coord)
 	{
@@ -93,6 +104,10 @@ public:
 
 	}
 	
+	/// <summary>
+	///     Draws the previously rendered mesh again using cached data.
+	/// </summary>
+	/// <returns>None.</returns>
 	void draw_last()
 	{
 		if(quad_model.Meshes.empty())
