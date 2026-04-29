@@ -26,6 +26,14 @@ private:
 
         std::shared_ptr<Channel> downstream = nullptr; // next channel to receive the event if this chanel didn't consume it
 
+        /// <summary>
+        ///     Event processing loop that handles immediate and queued events.
+        /// </summary>
+        /// <remarks>
+        ///     Continuously waits for signals, processes immediate events instantly,
+        ///     and processes queued events in order while managing thread safety.
+        /// </remarks>
+        /// <returns>None.</returns>
         void run() {
             while (running) {
                 {
@@ -97,6 +105,10 @@ private:
             }
         }
 
+        /// <summary>
+        ///     Handles and dispatches an event based on its scope (Targeted or Announcement).
+        /// </summary>
+        /// <param name="event">[in] Event to be processed and dispatched.</param>
         void handle_event(std::unique_ptr<Event> event)
         {
             if (event->scope == Event_scope::Targeted)
@@ -178,13 +190,22 @@ private:
             worker.join();
         }
 
-        // Subscribe an event_receiver to an event ID
+        /// <summary>
+        ///     Subscribes a receiver to a specific event type.
+        /// </summary>
+        /// <param name="event_type">[in] Type of event to subscribe to.</param>
+        /// <param name="receiver">[in] Event receiver to be notified.</param>
         void subscribe(const Event_type event_type,const Event_receiver_shared& receiver)
         {
             std::lock_guard<std::mutex> lock(mutex);
             subscribers[event_type].push_back(receiver);
         }
 
+        /// <summary>
+        ///     Pushes an event into the system for processing.
+        ///     Immediate events are dispatched instantly, queued events are stored.
+        /// </summary>
+        /// <param name="event">[in] Event to be thrown into the event system.</param>
         void throw_event(std::unique_ptr<Event> event)
         {
             std::unique_lock<std::mutex> lock(mutex);
@@ -201,11 +222,18 @@ private:
             }
         }
 
+        /// <summary>
+        ///     Sets or changes the downstream channel for event forwarding.
+        /// </summary>
+        /// <param name="new_downstream">[in] New downstream channel (can be nullptr to remove).</param>
         void change_downstream(const std::shared_ptr<Channel>& new_downstream = nullptr)
         {
             this->downstream = new_downstream;
         }
 
+        /// <summary>
+        ///     Wakes up the event processing thread.
+        /// </summary>
         void tick()
         {
             signal.notify_one();
@@ -218,7 +246,11 @@ private:
 
 public:
 
-    // Creates a channel if it doesn't exist, returns false if name already taken
+    /// <summary>
+    ///     Creates a new event channel with the given name.
+    /// </summary>
+    /// <param name="name">[in] Name of the channel to create.</param>
+    /// <returns>True if the channel was created, false if it already exists.</returns>
     bool create_channel(const std::string& name)
     {
         std::lock_guard<std::mutex> lock(channels_mutex);
@@ -231,6 +263,10 @@ public:
         return true;
     }
 
+    /// <summary>
+    ///     Destroys an existing event channel by name.
+    /// </summary>
+    /// <param name="name">[in] Name of the channel to destroy.</param>
     void destroy_channel(const std::string& name)
     {
         std::lock_guard<std::mutex> lock(channels_mutex);
@@ -243,6 +279,12 @@ public:
         channels.erase(it);
     }
 
+    /// <summary>
+    ///     Subscribes a receiver to a specific event type within a channel.
+    /// </summary>
+    /// <param name="channel_name">[in] Name of the channel.</param>
+    /// <param name="event_type">[in] Type of event to subscribe to.</param>
+    /// <param name="receiver">[in] Event receiver to be notified.</param>
     void subscribe(const std::string& channel_name, const Event_type event_type, const Event_receiver_shared& receiver)
     {
         std::lock_guard<std::mutex> lock(channels_mutex);
@@ -255,6 +297,11 @@ public:
         it->second->subscribe(event_type, receiver);
     }
 
+    /// <summary>
+    ///     Throws an event into a specific channel for processing.
+    /// </summary>
+    /// <param name="channel_name">[in] Name of the target channel.</param>
+    /// <param name="event">[in] Event to be dispatched.</param>
     void throw_event(const std::string& channel_name, std::unique_ptr<Event> event)
     {
         std::lock_guard<std::mutex> lock(channels_mutex);
@@ -267,6 +314,10 @@ public:
         it->second->throw_event(std::move(event));
     }
 
+    /// <summary>
+    ///     Triggers a tick on the specified channel to wake its event processing thread.
+    /// </summary>
+    /// <param name="channel_name">[in] Name of the channel to tick.</param>
     void tick(const std::string& channel_name)
     {
         std::lock_guard<std::mutex> lock(channels_mutex);
@@ -279,6 +330,9 @@ public:
         it->second->tick();
     }
 
+    /// <summary>
+    ///     Triggers a tick on all channels to wake their event processing threads.
+    /// </summary>
     void tick_all()
     {
         std::lock_guard<std::mutex> lock(channels_mutex);
@@ -289,6 +343,13 @@ public:
     }
 
     // connect upstream -> downstream, pass nullptr as downstream to disconnect
+
+    /// <summary>
+    ///     Connects an upstream channel to a downstream channel for event forwarding.
+    /// </summary>
+    /// <param name="upstream_name">[in] Name of the upstream channel.</param>
+    /// <param name="downstream">[in] Downstream channel (can be nullptr to disconnect).</param>
+    /// <returns>True if connection succeeded, false otherwise.</returns>
     bool connect(const std::string& upstream_name, const std::shared_ptr<Channel>& downstream = nullptr)
     {
         std::lock_guard<std::mutex> lock(channels_mutex);
