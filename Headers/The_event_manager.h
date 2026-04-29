@@ -4,8 +4,6 @@
 
 #include "Globals.h"
 
-using namespace Event_management;
-
 class Event_manager
 {
 private:
@@ -14,10 +12,10 @@ private:
     private:
         std::mutex mutex;//locks everything
 
-        std::unordered_map<Event_type, std::vector<Event_receiver_weak>> subscribers;
+        std::unordered_map<Event_management::Event_type, std::vector<Event_management::Event_receiver_weak>> subscribers;
 
-        std::queue<std::unique_ptr<Event>> event_queue;
-        std::unique_ptr<Event> immediate_event;
+        std::queue<std::unique_ptr<Event_management::Event>> event_queue;
+        std::unique_ptr<Event_management::Event> immediate_event;
 
         std::thread worker;
 
@@ -50,13 +48,13 @@ private:
                     if (immediate_event != nullptr )
                     {
 
-                        if(immediate_event->timing == Event_timing::Queued)
+                        if(immediate_event->timing == Event_management::Event_timing::Queued)
                         {
                             event_queue.push(std::move(immediate_event));
                             LOG_WARNING("The_event_manager - Queued event in immediate? is this intentional?\n"
 								"moved it into que!");
                         }
-                        else if (immediate_event->timing == Event_timing::Immediate)
+                        else if (immediate_event->timing == Event_management::Event_timing::Immediate)
                         {
                             //TODO: if another immediate event comes during this, it throws an segmentation fault
                             //lock.unlock();
@@ -78,17 +76,17 @@ private:
                     {
                         while (!event_queue.empty())
                         {
-                            std::unique_ptr<Event> event = std::move(event_queue.front());
+                            std::unique_ptr<Event_management::Event> event = std::move(event_queue.front());
                             event_queue.pop();
 
-                            if(event->timing == Event_timing::Immediate)
+                            if(event->timing == Event_management::Event_timing::Immediate)
                             {
                                 LOG_WARNING("The_event_manager - Immediate event in queue? is this intentional?\n"
 									"turned it into Queued!");
-                                event->timing = Event_timing::Queued;
+                                event->timing = Event_management::Event_timing::Queued;
                             }
 
-                            if (event->timing == Event_timing::Queued)
+                            if (event->timing == Event_management::Event_timing::Queued)
                             {
                                 lock.unlock();
                                 handle_event(std::move(event));
@@ -109,11 +107,11 @@ private:
         ///     Handles and dispatches an event based on its scope (Targeted or Announcement).
         /// </summary>
         /// <param name="event">[in] Event to be processed and dispatched.</param>
-        void handle_event(std::unique_ptr<Event> event)
+        void handle_event(std::unique_ptr<Event_management::Event> event)
         {
-            if (event->scope == Event_scope::Targeted)
+            if (event->scope == Event_management::Event_scope::Targeted)
             {
-                const Event_receiver_shared shared_pointer = event->target_receiver.lock();
+                const Event_management::Event_receiver_shared shared_pointer = event->target_receiver.lock();
                 if (shared_pointer != nullptr)
                 {
                     //THE event call
@@ -131,19 +129,19 @@ private:
                     event->is_alive = false;
                 }
             }
-            else if (event->scope == Event_scope::Announcement)
+            else if (event->scope == Event_management::Event_scope::Announcement)
             {
-                const Event_type type = event->type;
+                const Event_management::Event_type type = event->type;
 
-                std::vector<Event_receiver_weak>& vec = subscribers[type];
+                std::vector<Event_management::Event_receiver_weak>& vec = subscribers[type];
 
                 vec.erase(std::remove_if(vec.begin(), vec.end(),
-                    [](const Event_receiver_weak& w){ return w.expired(); }),
+                    [](const Event_management::Event_receiver_weak& w){ return w.expired(); }),
                     vec.end());
 
-                for (const Event_receiver_weak& receiver : vec)
+                for (const Event_management::Event_receiver_weak& receiver : vec)
                 {
-                    const Event_receiver_shared shared_pointer = receiver.lock();
+                    const Event_management::Event_receiver_shared shared_pointer = receiver.lock();
                     if(shared_pointer != nullptr)
                     {
                         (*shared_pointer)(*event);
@@ -195,7 +193,7 @@ private:
         /// </summary>
         /// <param name="event_type">[in] Type of event to subscribe to.</param>
         /// <param name="receiver">[in] Event receiver to be notified.</param>
-        void subscribe(const Event_type event_type,const Event_receiver_shared& receiver)
+        void subscribe(const Event_management::Event_type event_type,const Event_management::Event_receiver_shared& receiver)
         {
             std::lock_guard<std::mutex> lock(mutex);
             subscribers[event_type].push_back(receiver);
@@ -206,10 +204,10 @@ private:
         ///     Immediate events are dispatched instantly, queued events are stored.
         /// </summary>
         /// <param name="event">[in] Event to be thrown into the event system.</param>
-        void throw_event(std::unique_ptr<Event> event)
+        void throw_event(std::unique_ptr<Event_management::Event> event)
         {
             std::unique_lock<std::mutex> lock(mutex);
-            if(event->timing == Event_timing::Immediate)
+            if(event->timing == Event_management::Event_timing::Immediate)
             {
                 immediate_event = std::move(event);
                 lock.unlock();//need to unlock so thread can lock it and work
@@ -285,7 +283,7 @@ public:
     /// <param name="channel_name">[in] Name of the channel.</param>
     /// <param name="event_type">[in] Type of event to subscribe to.</param>
     /// <param name="receiver">[in] Event receiver to be notified.</param>
-    void subscribe(const std::string& channel_name, const Event_type event_type, const Event_receiver_shared& receiver)
+    void subscribe(const std::string& channel_name, const Event_management::Event_type event_type, const Event_management::Event_receiver_shared& receiver)
     {
         std::lock_guard<std::mutex> lock(channels_mutex);
         const auto it = channels.find(channel_name);
@@ -302,7 +300,7 @@ public:
     /// </summary>
     /// <param name="channel_name">[in] Name of the target channel.</param>
     /// <param name="event">[in] Event to be dispatched.</param>
-    void throw_event(const std::string& channel_name, std::unique_ptr<Event> event)
+    void throw_event(const std::string& channel_name, std::unique_ptr<Event_management::Event> event)
     {
         std::lock_guard<std::mutex> lock(channels_mutex);
         const auto it = channels.find(channel_name);

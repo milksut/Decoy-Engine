@@ -18,6 +18,14 @@ private:
     int last_point_count = 0;
     bool has_data = false;
 
+    /// <summary>
+    ///     Ensures VAO/VBO buffers exist and are sized correctly for quad vertex data.
+    /// </summary>
+    /// <remarks>
+    ///     Allocates buffers if needed and configures vertex attribute layout.
+    ///     Reallocates GPU memory only when vertex count changes.
+    /// </remarks>
+    /// <param name="point_count">[in] Number of vertices to allocate space for.</param>
     void ensure_buffers(int point_count)
     {
         if (VAO == 0)
@@ -52,6 +60,15 @@ private:
             (void*)offsetof(QuadVertex, tex_coord));
     }
 
+    /// <summary>
+    ///     Binds textures and updates shader sampler arrays for rendering.
+    /// </summary>
+    /// <remarks>
+    ///     Ensures textures are assigned to GPU slots and grouped by type.
+    ///     Sends TEX_COUNTS and per-type texture slot arrays to the shader.
+    ///     Quad renderer does not use materials (material_index = -1).
+    /// </remarks>
+    /// <param name="main_textures">[in] List of textures used for rendering.</param>
     void bind_textures(const std::vector<Texture>& main_textures)
     {
         // Bind textures to slots first
@@ -99,6 +116,17 @@ public:
     Quad_renderer(const Quad_renderer&) = delete;
     Quad_renderer& operator=(const Quad_renderer&) = delete;
 
+    /// <summary>
+    ///     Draws a dynamic quad/point set using CPU-generated vertex data.
+    /// </summary>
+    /// <remarks>
+    ///     Builds interleaved vertex buffer (position + texcoord), uploads it to GPU,
+    ///     binds textures, and renders using GL_POINTS.
+    ///     Performs validation on input sizes and uses a dynamic buffer strategy.
+    /// </remarks>
+    /// <param name="points">[in] List of vertex positions (vec3 per vertex).</param>
+    /// <param name="textures">[in] Textures used for rendering.</param>
+    /// <param name="tex_coords">[in] Optional texture coordinates (vec2 per vertex).</param>
     void draw(const std::vector<std::vector<float>>& points,
         const std::vector<Texture>& textures,
         const std::vector<std::vector<float>>& tex_coords = {})
@@ -154,6 +182,13 @@ public:
         has_data = true;
     }
 
+    /// <summary>
+    ///     Draws the last uploaded quad/point data without re-uploading buffers.
+    /// </summary>
+    /// <remarks>
+    ///     Uses previously stored VAO and last vertex count for rendering.
+    ///     Intended for repeated draws of static/dynamic data.
+    /// </remarks>
     void draw_last()
     {
         if (!has_data || VAO == 0)

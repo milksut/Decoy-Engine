@@ -10,8 +10,6 @@
 #include <sstream>
 #include <iostream>
 
-using namespace Shader_variables;
-
 class Shader
 {
 private:
@@ -164,7 +162,7 @@ public:
     /// </summary>
     void use()
     {
-        current_shader_id = ID;
+        Shader_variables::current_shader_id = ID;
         glUseProgram(ID);
     }
 
@@ -178,7 +176,7 @@ public:
     /// <param name="value">[in] The boolean value to set.</param>
     void setBool(const std::string& name, bool value)
     {
-        if (current_shader_id != ID)
+        if (Shader_variables::current_shader_id != ID)
             use();
 
 		if(uniform_locations.find(name) == uniform_locations.end())
@@ -195,7 +193,7 @@ public:
     /// <param name="value">[in] The integer value to set.</param>
     void setInt(const std::string& name, int value) 
     {
-        if (current_shader_id != ID)
+        if (Shader_variables::current_shader_id != ID)
             use();
 
         if (uniform_locations.find(name) == uniform_locations.end())
@@ -214,7 +212,7 @@ public:
     /// <param name="amount">[in] The number of integers in the array.</param>
     void setInt(const std::string& name, int value[], int amount)
     {
-        if (current_shader_id != ID)
+        if (Shader_variables::current_shader_id != ID)
             use();
 
         if (uniform_locations.find(name) == uniform_locations.end())
@@ -231,7 +229,7 @@ public:
     /// <param name="value">[in] The float value to set.</param>
     void setFloat(const std::string& name, float value)
     {
-        if (current_shader_id != ID)
+        if (Shader_variables::current_shader_id != ID)
             use();
 
         if (uniform_locations.find(name) == uniform_locations.end())
@@ -249,7 +247,7 @@ public:
     /// <param name="amount">[in] The number of floats in the array.</param>
     void setFloat(const std::string& name, float value[], int amount)
     {
-        if (current_shader_id != ID)
+        if (Shader_variables::current_shader_id != ID)
             use();
 
         if (uniform_locations.find(name) == uniform_locations.end())
@@ -267,7 +265,7 @@ public:
     /// <param name="value">[in] Pointer to an array of 16 floats representing the matrix.</param>
     void setMatrix4fv(const std::string& name, const float* value)
     {
-        if (current_shader_id != ID)
+        if (Shader_variables::current_shader_id != ID)
             use();
 
         if (uniform_locations.find(name) == uniform_locations.end())
@@ -285,7 +283,7 @@ public:
     
     void setVec4(const std::string& name, const glm::vec4& value)
     {
-        if (current_shader_id != ID)
+        if (Shader_variables::current_shader_id != ID)
             use();
 
         if (uniform_locations.find(name) == uniform_locations.end())
@@ -303,7 +301,7 @@ public:
     /// <param name="amount">[in] The number of vec4's in the array.</param>
     void setVec4(const std::string& name, const glm::vec4 value[], int amount)
     {
-        if (current_shader_id != ID)
+        if (Shader_variables::current_shader_id != ID)
             use();
 
         if (uniform_locations.find(name) == uniform_locations.end())
@@ -321,7 +319,7 @@ public:
     /// <param name="value">[in] The vec3 value to set.</param>
     void setVec3(const std::string& name, const glm::vec3& value)
     {
-        if (current_shader_id != ID)
+        if (Shader_variables::current_shader_id != ID)
             use();
 
         if (uniform_locations.find(name) == uniform_locations.end())

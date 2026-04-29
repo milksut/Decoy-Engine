@@ -221,7 +221,7 @@ public:
     /// <param name="channel">[in] Input channel to subscribe to.</param>
     /// <param name="event_type">[in] Type of event to listen for.</param>
     /// <param name="receiver">[in] Event receiver to be notified.</param>
-    void subscribe(Input_channel channel, const Event_type event_type, const Event_receiver_shared& receiver)
+    void subscribe(Input_channel channel, const Event_management::Event_type event_type, const Event_management::Event_receiver_shared& receiver)
     {
 		event_manager.subscribe(Input_channel_names[channel], event_type, receiver);
     }

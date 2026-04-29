@@ -172,7 +172,7 @@ int main()
 	game_object_basic_model backpack;
 	//backpack.import_model_from_file("C:\\Users\\altay\\Desktop\\pull_from_this_easy\\Backpack.obj");
 
-	backpack.import_model_from_file("C:\\Users\\altay\\Desktop\\data\\pull_from_this_easy\\backpack\\backpack.obj");
+	backpack.import_model_from_file("Models/Tree1.obj");
 	
 	//-*-*-*-*-*-*-*-**-*-*-*-*-**-*-*-*-*-*-*-*-*-*-*-*-*-*-*-**-*-*-*-*-*-*-*-*
 	int grid_amount = 10;
@@ -245,9 +245,9 @@ int main()
 
 	
 
-	Event_receiver_shared camera_trigger = make_receiver([](const Event& e)
+	Event_management::Event_receiver_shared camera_trigger = Event_management::make_receiver([](const Event_management::Event& e)
 	{
-		if (e.type == Event_type::Mouse_moved)
+		if (e.type == Event_management::Event_type::Mouse_moved)
 		{
 			const auto& mouse = dynamic_cast<const Mouse_move_event&>(e);
 			camera->process_mouse_movement(mouse.mouse_x_offset, mouse.mouse_y_offset,
@@ -256,7 +256,7 @@ int main()
 		}
 	});
 
-	input_manager->subscribe(Mouse_input, Event_type::Mouse_moved, camera_trigger);
+	input_manager->subscribe(Mouse_input, Event_management::Event_type::Mouse_moved, camera_trigger);
 
 	/*/? TEST CODE------------------------------------------------------------------------------------------------------
 	// subscriber that prints mouse movement
