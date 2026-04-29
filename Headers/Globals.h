@@ -29,22 +29,25 @@ enum Key_state
 #include <glad/glad.h> 
 #include <GLFW/glfw3.h>
 #include <glm/glm.hpp>
+
+#include <array>
 #include <string>
 #include <vector>
-#include <memory>
 #include <stack>
-#include <functional>
+#include <queue>
 #include <unordered_map>
 
+#include <thread>
+#include <memory>
+#include <mutex>
+#include <condition_variable>
+
+#include <functional>
 #include <iostream>
 #include <ctime>
 #include <fstream>
 #include <cstdarg>
 
-#include <mutex>
-#include <condition_variable>
-#include <thread>
-#include <queue>
 
 
 #ifdef _WIN32
@@ -545,10 +548,14 @@ namespace Texture_slots {
 
 namespace Ubo_slots
 {
-	//TODO: CREATE A MANGAMENT sytem later, for now this just gives slot id and dont change anything
 
 	unsigned int bound_slots[MAX_UBO_BINDING_POINTS] = { 0 };
+	unsigned int slot_age[MAX_UBO_BINDING_POINTS] = { 0 };
 
+	/// <summary>
+	///     Returns the index of the first empty UBO binding slot.
+	/// </summary>
+	/// <returns>Index of the first empty slot, or -1 if all are occupied.</returns>
 	int get_first_empty_slot()
 	{
 		for (int i = 0; i < MAX_UBO_BINDING_POINTS; i++) {
@@ -558,16 +565,142 @@ namespace Ubo_slots
 		}
 		return -1;
 	}
+
+	/// <summary>
+	///     Finds the bound slot index for a given UBO ID.
+	/// </summary>
+	/// <param name="ubo_id">[in] The UBO ID to search for.</param>
+	/// <returns>Index of the slot if bound, or -1 if not found.</returns>
+	int get_index_of_bound_slot(const unsigned int ubo_id)
+	{
+		for (int i = 0; i < MAX_UBO_BINDING_POINTS; ++i) {
+			if (bound_slots[i] == ubo_id) {
+				return i;
+			}
+		}
+		return -1;
+	}
+
+	/// <summary>
+	///     Finds the index of the oldest bound UBO slot based on slot ages.
+	/// </summary>
+	/// <returns>Index of the oldest bound UBO slot.</returns>
+	int get_oldest_slot()
+	{
+		int oldest_index = 0;
+		unsigned int max_age = 0;
+		for (int i = 0; i < MAX_UBO_BINDING_POINTS; ++i) {
+			if (slot_age[i] > max_age) {
+				max_age = slot_age[i];
+				oldest_index = i;
+			}
+		}
+		return oldest_index;
+	}
+
+	/// <summary>
+	///     Increments the age of all currently bound UBO slots.
+	///     Call this at the end of each frame to track how long UBOs have been bound.
+	/// </summary>
+	void age_slots()
+	{
+		for (int i = 0; i < MAX_UBO_BINDING_POINTS; ++i) {
+			if (bound_slots[i] != 0) {
+				slot_age[i]++;
+			}
+		}
+	}
+
+	/// <summary>
+	///     Unbinds a UBO from a slot and resets its tracking info.
+	/// </summary>
+	/// <param name="slot_index">[in] Index of the UBO slot to unbind.</param>
+	void unbind_ubo(const int slot_index)
+	{
+		if (slot_index >= 0 && slot_index < MAX_UBO_BINDING_POINTS)
+		{
+			glBindBufferBase(GL_UNIFORM_BUFFER, slot_index, 0);
+			bound_slots[slot_index] = 0;
+			slot_age[slot_index] = 0;
+		}
+		else
+		{
+			LOG_ERROR("Invalid UBO slot index %d for unbinding! Must be between 0 and %d.",
+				slot_index, MAX_UBO_BINDING_POINTS - 1);
+		}
+	}
+
+	/// <summary>
+	///     Binds a UBO to a specific slot index directly.
+	///     Prefer bind_ubo() for automatic slot management.
+	/// </summary>
+	/// <param name="ubo_id">[in] The UBO ID to bind.</param>
+	/// <param name="slot_index">[in] The slot index to bind to.</param>
 	void bind_ubo_to_slot(unsigned int ubo_id, int slot_index)
 	{
 		if (slot_index >= 0 && slot_index < MAX_UBO_BINDING_POINTS)
 		{
 			glBindBufferBase(GL_UNIFORM_BUFFER, slot_index, ubo_id);
 			bound_slots[slot_index] = ubo_id;
+			slot_age[slot_index] = 0;
 		}
 		else
 		{
-			LOG_ERROR("Invalid UBO slot index %d! Must be between 0 and %d.", slot_index, MAX_UBO_BINDING_POINTS - 1);
+			LOG_ERROR("Invalid UBO slot index %d! Must be between 0 and %d.",
+				slot_index, MAX_UBO_BINDING_POINTS - 1);
+		}
+	}
+
+	/// <summary>
+	///     Binds a UBO to an available slot, or replaces the oldest if all are full.
+	///     If the UBO is already bound, resets its age and returns its current slot.
+	/// </summary>
+	/// <param name="ubo_id">[in] The UBO ID to bind.</param>
+	/// <returns>Index of the slot the UBO was bound to, or -1 on error.</returns>
+	int bind_ubo(const unsigned int ubo_id)
+	{
+		if (ubo_id == 0)
+		{
+			LOG_ERROR("Attempted to bind invalid UBO ID 0!");
+			return -1;
+		}
+
+		int slot_index = get_index_of_bound_slot(ubo_id);
+		if (slot_index != -1) {
+			// Already bound, just refresh age
+			slot_age[slot_index] = 0;
+			return slot_index;
+		}
+
+		slot_index = get_first_empty_slot();
+		if (slot_index == -1)
+		{
+			// No free slots — evict the oldest
+			slot_index = get_oldest_slot();
+			LOG_WARNING("UBO slots full, evicting oldest UBO (slot %d, ubo_id %d).",
+				slot_index, bound_slots[slot_index]);
+			unbind_ubo(slot_index);
+		}
+
+		bind_ubo_to_slot(ubo_id, slot_index);
+		return slot_index;
+	}
+
+	/// <summary>
+	///     Unbinds a UBO by its ID, finding and clearing its slot.
+	///     No-op if the UBO is not currently bound.
+	/// </summary>
+	/// <param name="ubo_id">[in] The UBO ID to unbind.</param>
+	void unbind_ubo_by_id(const unsigned int ubo_id)
+	{
+		const int slot_index = get_index_of_bound_slot(ubo_id);
+		if (slot_index != -1)
+		{
+			unbind_ubo(slot_index);
+		}
+		else
+		{
+			LOG_WARNING("Tried to unbind UBO ID %d but it was not bound to any slot.", ubo_id);
 		}
 	}
 }

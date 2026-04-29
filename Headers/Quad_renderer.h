@@ -1,106 +1,168 @@
 #pragma once
-
 #include "Shader.h"
 #include "Globals.h"
 #include "Some_functions.h"
+#include <glad/glad.h>
 
-#include "game_object_basic_model.h"
+struct QuadVertex {
+    float position[3];
+    float tex_coord[2];
+};
 
 class Quad_renderer
 {
 private:
-	//model is only used for its methods,
-	//we are gonna give point list as vertices and create shapes using the geometry shader
-	game_object_basic_model quad_model;
-	Shader *shader;
-	std::shared_ptr<class_region> region;
+    Shader* shader;
 
-	//quad-shape
-	float total_width = 0.0f;
-	float total_height = 0.0f;
+    unsigned int VAO = 0, VBO = 0;
+    int last_point_count = 0;
+    bool has_data = false;
 
-	//texture-shape
-	float tex_total_width = 0.0f;
-	float tex_total_height = 0.0f;
+    void ensure_buffers(int point_count)
+    {
+        if (VAO == 0)
+        {
+            glGenVertexArrays(1, &VAO);
+            glGenBuffers(1, &VBO);
+        }
+
+        glBindVertexArray(VAO);
+        glBindBuffer(GL_ARRAY_BUFFER, VBO);
+
+        // Only reallocate if size changed
+        if (point_count != last_point_count)
+        {
+            glBufferData(GL_ARRAY_BUFFER,
+                point_count * sizeof(QuadVertex),
+                nullptr,
+                GL_DYNAMIC_DRAW);
+            last_point_count = point_count;
+        }
+
+        // position: location 0, vec3
+        glEnableVertexAttribArray(0);
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE,
+            sizeof(QuadVertex),
+            (void*)offsetof(QuadVertex, position));
+
+        // tex_coord: location 1, vec2
+        glEnableVertexAttribArray(1);
+        glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE,
+            sizeof(QuadVertex),
+            (void*)offsetof(QuadVertex, tex_coord));
+    }
+
+    void bind_textures(const std::vector<Texture>& main_textures)
+    {
+        // Bind textures to slots first
+        for (int i = 0; i < TEXTURE_SLOTS && i < (int)main_textures.size(); i++)
+        {
+            Texture_slots::bound_texture(main_textures[i].id); // ensures it's in a slot
+        }
+
+        std::array<std::vector<int>, Tex_type_amount> texture_locations;
+        for (std::vector<int>& var : texture_locations)
+        {
+           var.reserve(TEXTURE_SLOTS);
+        }
+
+        int counts[Tex_type_amount] = { 0 };
+
+        for (int i = 0; i < TEXTURE_SLOTS && i < (int)main_textures.size(); i++)
+        {
+            int slot_index = Texture_slots::bound_texture(main_textures[i].id);
+            counts[main_textures[i].type]++;
+            texture_locations[main_textures[i].type].push_back(slot_index);
+        }
+
+        shader->setInt("TEX_COUNTS", counts, Tex_type_amount);
+        for (int i = 0; i < Tex_type_amount; i++)
+        {
+            if (counts[i] > 0)
+                shader->setInt(Tex_Types_Names[i], texture_locations[i].data(), counts[i]);
+        }
+
+        // Quad renderer never has a material, so always -1
+        shader->setInt("material_index", -1);
+    }
 
 public:
-	Quad_renderer(Shader *shader)
-		:shader(shader)
-	{}
+    Quad_renderer(Shader* shader) : shader(shader) {}
 
-	void draw(const std::vector<std::vector<float>>& points, const std::vector<Texture>& textures)
-	{
-		const std::vector<std::vector<float>> empty;
-		draw(points, textures, empty);
-	}
+    ~Quad_renderer()
+    {
+        if (VAO) glDeleteVertexArrays(1, &VAO);
+        if (VBO) glDeleteBuffers(1, &VBO);
+    }
 
-	void draw(const std::vector<std::vector<float>> points,const std::vector<Texture>& textures,
-		const std::vector<std::vector<float>>& tex_coord)
-	{
-		if(!tex_coord.empty() && tex_coord.size() != points.size())
-		{
-			LOG_FATAL("Quad_renderer: Recived point and tex_coords is not the same size");
-			throw std::runtime_error("Quad_renderer: Recived point and tex_coords is not the same size");
-		}
-		std::vector<vertex_data> data;
-		data.reserve(points.size());
-		for(int i = 0; i< points.size(); i++)
-		{
+    // No copy
+    Quad_renderer(const Quad_renderer&) = delete;
+    Quad_renderer& operator=(const Quad_renderer&) = delete;
 
-			if(points[i].size() != 3)
-			{
-				LOG_FATAL("Quad_renderer: Recived points is not expeted shape");
-				throw std::runtime_error("Quad_renderer: Recived points is not expeted shape");
-			}
-			float tex_coord_temp[2] = { 0,0 };
+    void draw(const std::vector<std::vector<float>>& points,
+        const std::vector<Texture>& textures,
+        const std::vector<std::vector<float>>& tex_coords = {})
+    {
+        if (points.empty()) return;
 
-			if(!tex_coord.empty())
-			{
-				if(tex_coord[i].size() != 2)
-				{
-					LOG_FATAL("Quad_renderer: Recived tex_coords is not expeted shape");
-					throw std::runtime_error("Quad_renderer: Recived tex_coords is not expeted shape");
-				}
-				else
-				{
-					tex_coord_temp[0] = tex_coord[i][0];
-					tex_coord_temp[1] = tex_coord[i][1];
+        if (!tex_coords.empty() && tex_coords.size() != points.size())
+        {
+            LOG_FATAL("Quad_renderer: points and tex_coords size mismatch");
+            throw std::runtime_error("Quad_renderer: size mismatch");
+        }
 
-				}
-			}
-			
-			vertex_data point_data =
-			{
-				{points[i][0],points[i][1],points[i][2]},
-				{tex_coord_temp[0],tex_coord_temp[1]},
-				{0,0,1}
-			};
-			data.push_back(point_data);
-		}
-		std::vector<unsigned int> empty;
+        int count = (int)points.size();
+        
 
-		if(quad_model.Meshes.empty())
-		{
-			quad_model.add_mesh(data, empty, textures);
-			region = quad_model.reserve_class_region(1);
-		}
-		else
-		{
-			quad_model.Meshes[0]->update_mesh(data, empty, textures, true);
-		}
+        // Build interleaved vertex data
+        std::vector<QuadVertex> verts(count);
+        for (int i = 0; i < count; i++)
+        {
+            if (points[i].size() != 3)
+            {
+                LOG_FATAL("Quad_renderer: point must be vec3");
+                throw std::runtime_error("Quad_renderer: point must be vec3");
+            }
+            verts[i].position[0] = points[i][0];
+            verts[i].position[1] = points[i][1];
+            verts[i].position[2] = points[i][2];
 
-		quad_model.draw(*shader, region);
+            if (!tex_coords.empty())
+            {
+                if (tex_coords[i].size() != 2)
+                {
+                    LOG_FATAL("Quad_renderer: tex_coord must be vec2");
+                    throw std::runtime_error("Quad_renderer: tex_coord must be vec2");
+                }
+                verts[i].tex_coord[0] = tex_coords[i][0];
+                verts[i].tex_coord[1] = tex_coords[i][1];
+            }
+            else
+            {
+                verts[i].tex_coord[0] = 0.0f;
+                verts[i].tex_coord[1] = 0.0f;
+            }
+        }
+        ensure_buffers(count);
+        glBufferSubData(GL_ARRAY_BUFFER, 0,
+            count * sizeof(QuadVertex),
+            verts.data());
 
-	}
-	
-	void draw_last()
-	{
-		if(quad_model.Meshes.empty())
-		{
-			LOG_WARNING("Quad_renderer: No mesh to draw");
-			return;
-		}
-		quad_model.draw(*shader, region);
-	}
+        bind_textures(textures);
+        glDrawArrays(GL_POINTS, 0, count);;
 
+        has_data = true;
+    }
+
+    void draw_last()
+    {
+        if (!has_data || VAO == 0)
+        {
+            LOG_WARNING("Quad_renderer: no mesh to draw");
+            return;
+        }
+        glBindVertexArray(VAO);
+        glDrawArrays(GL_POINTS, 0, last_point_count);
+        glBindVertexArray(0);
+    }
 };
