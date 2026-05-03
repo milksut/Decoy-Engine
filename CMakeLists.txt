@@ -2,6 +2,9 @@
 set(CMAKE_POLICY_VERSION_MINIMUM 3.5)
 project ("Decoy_Engine")
 
+# Require C++17 for EnTT and modern headers
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # 1. BASIC SETTINGS
 set(FETCHCONTENT_BASE_DIR "${CMAKE_SOURCE_DIR}/external")
@@ -20,7 +23,6 @@ else()
     set(CMAKE_CXX_FLAGS_RELEASE "-O3 -march=native -flto")
     set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "-O3 -march=native -g -flto")
 endif()
-
 
 # Use after downloading dependencies to prevent checking each time
 set(FETCHCONTENT_FULLY_DISCONNECTED ON)
@@ -46,7 +48,6 @@ set(GLAD_API "gl=3.3")
 
 FetchContent_MakeAvailable(glad)
 
-
 # --- GLFW ---
 FetchContent_Declare(
   glfw
@@ -64,6 +65,17 @@ FetchContent_Declare(
   GIT_TAG 0.9.9.8
 )
 FetchContent_MakeAvailable(glm)
+
+# --- EnTT (Entity-Component-System) ---
+FetchContent_Declare(
+  entt
+  GIT_REPOSITORY https://github.com/skypjack/entt.git
+  GIT_TAG v3.16.0
+)
+FetchContent_MakeAvailable(entt)
+
+add_library(entt INTERFACE)
+target_include_directories(entt INTERFACE ${entt_SOURCE_DIR}/single_include)
 
 # --- ASSIMP ---
 FetchContent_Declare(
@@ -85,7 +97,6 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(stb)
 
-# Let's create an "interface" library for STB (because it's not a ready-made CMake project).
 add_library(stb INTERFACE)
 target_include_directories(stb INTERFACE ${stb_SOURCE_DIR})
 # -------------------------------------------------------------------
@@ -109,6 +120,7 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
     glm::glm 
     assimp::assimp
     stb
+    entt
 )
 
 target_include_directories(${PROJECT_NAME} PRIVATE 

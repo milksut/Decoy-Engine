@@ -56,10 +56,11 @@ private:
                         }
                         else if (immediate_event->timing == Event_management::Event_timing::Immediate)
                         {
-                            //TODO: if another immediate event comes during this, it throws an segmentation fault
-                            //lock.unlock();
-                            handle_event(std::move(immediate_event));
-                            //lock.lock();
+                            std::unique_ptr<Event_management::Event> local = std::move(immediate_event);
+                            immediate_event = nullptr;
+                            lock.unlock();
+                            handle_event(std::move(local));
+                            lock.lock();
                         }
                         else
                         {
