@@ -123,6 +123,7 @@ enum Key_state
 //Global variables-------------------------------------------------------------------------------
 	unsigned int draw_call_count = 0; //to track how many draw calls are made per frame
 	unsigned int tick_count = 0; //to track how many ticks are made per second
+	entt::registry registry; //global entity registry for entt
 //end of global variables------------------------------------------------------------------------
 
 
@@ -163,8 +164,15 @@ struct class_region //VBO regions given to classes and data inside them
 	int offset_in_numbers;//how many meshes can be drawn before this region
 	int size_in_number;//how many meshes can be drawn using this region
 
+	//TODO: pointers will be changed to use EnTT system
 	std::vector<std::shared_ptr<float>> data_ptrs;//datas for this region, vector index -> attribute index, and pointer for data
 	std::vector<unsigned int> data_amount;//amount of floats in data_ptr
+
+	//TODO: change the void* to object* when object class finished
+	//pointers to individual objects in this region, null* means currently no object using that slot, and can be used for new objects.
+	//used for object deletion/addition without changing offsets of other objects in the region, 
+	//and for tracking which object is where in the region, so we can batch upload when sequential objects changed (buffersubdata)
+	std::vector<void*> object_ptrs;
 };
 
 struct material_properties

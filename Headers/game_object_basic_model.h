@@ -399,7 +399,7 @@ private:
 		///     Creates an instance buffer for per-instance vertex attributes (e.g. colors, model matrices).
 		///     This function only allocates GPU buffers for each known class region; it does not upload data.
 		///     Use load_instance_buffer / load_all_regions_for_attribute to fill the buffer after creation.
-		///     Most VAOs support ~16 attribute slots (0–2 reserved for mesh data). Each slot can store up to 4 floats.
+		///     Most VAOs support ~16 attribute slots (0->2 reserved for mesh data). Each slot can store up to 4 floats.
 		///     If more is needed, multiple attribute indices are used.
 		///     Ensure sufficient vector capacity for all instance data; otherwise undefined behavior may occur.
 		/// </summary>
@@ -815,7 +815,7 @@ public:
 	/// <remarks>
 	///     Only allocates buffers. Use load_instance_buffer to fill data.
 	///     If expanding existing buffers, data must be reloaded after.
-	///     VAO typically supports ~16 attribute slots (0–2 reserved for mesh data).
+	///     VAO typically supports ~16 attribute slots (0->2 reserved for mesh data).
 	///     Each slot can hold up to 4 floats; larger data uses multiple slots.
 	///     Ensure sufficient instance data capacity; otherwise undefined behavior may occur.
 	/// </remarks>
