@@ -11,6 +11,8 @@
 
 - ASSİMP -> Dışarıdan modelleri yüklemeye yarayan kütüphane
 
+- EnTT -> Entity component system
+
 - X11 -> Linux kullanıcılarının kurması gerekiyor
 
 - After the initial download take out of the comment this line in CMakelists.txt
