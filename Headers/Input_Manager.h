@@ -30,7 +30,7 @@ private:
         mouse_y = y_pos;
 
         event_manager.throw_event("Mouse_input", std::make_unique<Mouse_move_event>(
-            mouse_x_offset, mouse_y_offset));
+            mouse_x_offset, mouse_y_offset, mouse_x, mouse_y));
     }
 
     /// <summary>
@@ -41,7 +41,7 @@ private:
     void mouse_scroll_callback(double x_offset, double y_offset)
     {
         event_manager.throw_event("Mouse_input",
-            std::make_unique<Mouse_scroll_event>(x_offset, y_offset));
+            std::make_unique<Mouse_scroll_event>(x_offset, y_offset, mouse_x, mouse_y));
     }
     
     //Separate pressed state arrays for keys and mouse buttons
@@ -157,17 +157,17 @@ public:
 
             if (is_pressed && was_pressed)
             {
-                event_manager.throw_event("Mouse_input", std::make_unique<Mouse_button_hold_event>(Input_key{ Mouse_input, btn }));
+                event_manager.throw_event("Mouse_input", std::make_unique<Mouse_button_hold_event>(Input_key{ Mouse_input, btn }, mouse_x, mouse_y));
 				Mouse_buttons[btn] = Hold;
             }
             else if (is_pressed)
             {
-                event_manager.throw_event("Mouse_input", std::make_unique<Mouse_button_press_event>(Input_key{ Mouse_input, btn }));
+                event_manager.throw_event("Mouse_input", std::make_unique<Mouse_button_press_event>(Input_key{ Mouse_input, btn }, mouse_x, mouse_y));
 				Mouse_buttons[btn] = Pressed;
             }
             else if (was_pressed)
             {
-                event_manager.throw_event("Mouse_input", std::make_unique<Mouse_button_release_event>(Input_key{ Mouse_input, btn }));
+                event_manager.throw_event("Mouse_input", std::make_unique<Mouse_button_release_event>(Input_key{ Mouse_input, btn }, mouse_x, mouse_y));
 				Mouse_buttons[btn] = Released;
             }
             else
