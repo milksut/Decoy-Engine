@@ -2,6 +2,7 @@
 
 #include <string>
 
-struct TagComponent {
+struct TagComponent 
+{
     std::string tag=""
 };
