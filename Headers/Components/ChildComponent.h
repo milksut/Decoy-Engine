@@ -3,5 +3,5 @@
 #include <entt/entt.hpp>
 
 struct ChildComponent {
-    entt::entity parent{ entt::null };
+    entt::entity child{ entt::null };
 };
