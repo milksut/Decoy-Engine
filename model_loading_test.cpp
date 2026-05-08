@@ -9,6 +9,7 @@
 #include "The_event_manager.h"
 
 
+bool camera_control = false;
 
 const double Target_fps = 144;
 const double Target_frame_time = 1.0 / Target_fps;
@@ -247,13 +248,19 @@ int main()
 
 	Event_management::Event_receiver_shared camera_trigger = Event_management::make_receiver([](const Event_management::Event& e)
 	{
-		if (e.type == Event_management::Event_type::Mouse_moved)
-		{
-			const auto& mouse = dynamic_cast<const Mouse_move_event&>(e);
-			camera->process_mouse_movement(mouse.mouse_x_offset, mouse.mouse_y_offset,
-				input_manager->mouse_sensitivity);
-			const_cast<Mouse_move_event&>(mouse).is_alive = false;
-		}
+			if (e.type == Event_management::Event_type::Mouse_moved)
+			{
+				const auto& mouse = dynamic_cast<const Mouse_move_event&>(e);
+
+				if (camera_control)
+				{
+					camera->process_mouse_movement(
+						mouse.mouse_x_offset,
+						mouse.mouse_y_offset,
+						input_manager->mouse_sensitivity
+					);
+				}
+			}
 	});
 
 	input_manager->subscribe(Mouse_input, Event_management::Event_type::Mouse_moved, camera_trigger);
@@ -353,7 +360,7 @@ int main()
 	glEnable(GL_DEPTH_TEST); // Enable depth testing for 3D rendering
 	glEnable(GL_CULL_FACE); // Enable face culling to improve performance
 	//glCullFace(GL_FRONT_AND_BACK);
-	glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+	glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
 	int x = 0, y = 0, z = 0;
 	double time_of_last_frame = 1;
 	std::string fps_text = "";
@@ -363,6 +370,7 @@ int main()
 
 	while (!glfwWindowShouldClose(window))
 	{
+		camera_control = glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_RIGHT) == GLFW_PRESS;
 
 		processInput(window, 0.1 * ((glfwGetTime() - time_of_last_frame) / Target_frame_time), camera);
 		time_of_last_frame = glfwGetTime();
