@@ -1,5 +1,5 @@
 #version 330 core
-#define MAX_TEX_PER_TYPE 16
+#define MAX_TEX_PER_TYPE 4
 #define MAX_MATERIALS 128
 
 in vec2 TexCoord;
@@ -62,20 +62,23 @@ void main()
      float shininess = 0;
      vec3 normal_map_val = vec3(0,0,0); 
 
-    for(int i=0; i<TEX_COUNTS[0];i++)
-    {
-        diff_map_val += vec3(texture(DIFFUSE[i], TexCoord) / float(TEX_COUNTS[0]));
-    }
+    // Sample diffuse textures with explicit indexing
+    if(TEX_COUNTS[0] > 0) diff_map_val += vec3(texture(DIFFUSE[0], TexCoord)) / float(TEX_COUNTS[0]);
+    if(TEX_COUNTS[0] > 1) diff_map_val += vec3(texture(DIFFUSE[1], TexCoord)) / float(TEX_COUNTS[0]);
+    if(TEX_COUNTS[0] > 2) diff_map_val += vec3(texture(DIFFUSE[2], TexCoord)) / float(TEX_COUNTS[0]);
+    if(TEX_COUNTS[0] > 3) diff_map_val += vec3(texture(DIFFUSE[3], TexCoord)) / float(TEX_COUNTS[0]);
 
-    for(int i=0; i<TEX_COUNTS[1];i++)
-    {
-        normal_map_val += vec3(texture(NORMAL[i], TexCoord) / float(TEX_COUNTS[1]));
-    }
+    // Sample normal textures with explicit indexing
+    if(TEX_COUNTS[1] > 0) normal_map_val += vec3(texture(NORMAL[0], TexCoord)) / float(TEX_COUNTS[1]);
+    if(TEX_COUNTS[1] > 1) normal_map_val += vec3(texture(NORMAL[1], TexCoord)) / float(TEX_COUNTS[1]);
+    if(TEX_COUNTS[1] > 2) normal_map_val += vec3(texture(NORMAL[2], TexCoord)) / float(TEX_COUNTS[1]);
+    if(TEX_COUNTS[1] > 3) normal_map_val += vec3(texture(NORMAL[3], TexCoord)) / float(TEX_COUNTS[1]);
     
-    for(int i=0; i<TEX_COUNTS[2];i++)
-    {
-        spec_val += vec3(texture(SPECULAR[i], TexCoord) / float(TEX_COUNTS[2]));
-    }
+    // Sample specular textures with explicit indexing
+    if(TEX_COUNTS[2] > 0) spec_val += vec3(texture(SPECULAR[0], TexCoord)) / float(TEX_COUNTS[2]);
+    if(TEX_COUNTS[2] > 1) spec_val += vec3(texture(SPECULAR[1], TexCoord)) / float(TEX_COUNTS[2]);
+    if(TEX_COUNTS[2] > 2) spec_val += vec3(texture(SPECULAR[2], TexCoord)) / float(TEX_COUNTS[2]);
+    if(TEX_COUNTS[2] > 3) spec_val += vec3(texture(SPECULAR[3], TexCoord)) / float(TEX_COUNTS[2]);
 
     if(material_index >= 0 && material_index < MAX_MATERIALS)
     {

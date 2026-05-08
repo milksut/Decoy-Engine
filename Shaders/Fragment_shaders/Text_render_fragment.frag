@@ -1,5 +1,5 @@
 #version 330 core
-#define MAX_TEX_PER_TYPE 16
+#define MAX_TEX_PER_TYPE 4
 
 out vec4 FragColor;
 
