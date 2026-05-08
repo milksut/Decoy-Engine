@@ -4,8 +4,6 @@
 
 #include "Globals.h"
 
-#include <glm/gtc/type_ptr.hpp>
-
 #include <fstream>
 #include <sstream>
 #include <iostream>

@@ -29,6 +29,7 @@ enum Key_state
 #include <glad/glad.h> 
 #include <GLFW/glfw3.h>
 #include <glm/glm.hpp>
+#include <glm/gtc/type_ptr.hpp>
 #include <entt/entt.hpp>
 
 #include <array>

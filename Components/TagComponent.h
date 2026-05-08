@@ -4,5 +4,5 @@
 
 struct TagComponent 
 {
-    std::string tag=""
+    std::string tag = "Undefined tag";
 };

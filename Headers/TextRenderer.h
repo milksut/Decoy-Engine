@@ -2,9 +2,6 @@
 #include "Shader.h"
 #include "Globals.h"
 
-#include <glm/gtc/matrix_transform.hpp>
-
-
 #include <fstream>
 
 #include "Some_functions.h"
