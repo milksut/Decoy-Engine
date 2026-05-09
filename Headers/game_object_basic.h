@@ -2,20 +2,151 @@
 
 #include "Globals.h"
 
+#include "game_object_basic_model.h"
+
 #include "Components/HierarchyComponents.h"
 #include "Components/TagComponent.h"
 #include "Components/TransformComponent.h"
 
-class game_object_basic
+//this class is for calling transform upload with each derived classes own static class region
+class game_object_base
+{
+public:
+
+void static Tick(entt::registry& registry)
+{
+	auto group = registry.group<TransformComponent, Self_component>(entt::get<>, entt::exclude<ParentComponent>);
+
+	group.each([](auto entity, TransformComponent& transform, Self_component& self)
+	{
+		self.this_object->tick_transforms(glm::mat4(1.0f));
+	});
+
+	upload_all_transforms();
+
+}
+
+protected:
+	static std::vector<std::function<void()>>& get_registry()
+	{
+		static std::vector<std::function<void()>> registry;
+		return registry;
+	}
+
+	static void register_upload_transform(std::function<void()> fn)
+	{
+		get_registry().push_back(std::move(fn));
+	}
+
+	static void upload_all_transforms()
+	{
+		for (auto& fn : get_registry())
+			fn();
+	}
+};
+
+template <typename Derived>
+class game_object_basic : public game_object_base
 {
 private:
+	struct auto_register
+	{
+		auto_register()
+		{
+			game_object_base::register_upload_transform([]() { Derived::tick_upload_transforms();});
+		}
+	};
+
+	static inline auto_register registerer{};
+	
+	static inline game_object_basic_model* model = nullptr;
+	static inline std::shared_ptr<class_region> region = nullptr;
+	static inline int attrib_index = -1;   // VAO attrib slot for world mat4 (e.g. 3)
+
+	static void tick_upload_transforms()
+	{
+		if (!model || !region || attrib_index < 0)
+			return;
+
+		const int region_size = static_cast<int>(region->object_ptrs.size());
+
+		std::vector<glm::mat4> staging;
+		staging.reserve(region_size); // avoid reallocations mid-loop
+
+		int batch_start = -1; // index in object_ptrs where current batch began
+
+		auto flush_batch = [&]()
+		{
+			if (batch_start == -1 || staging.empty())
+				return;
+
+			// offset_in_numbers is the region's start in the full VBO
+			// batch_start is our local index within the region
+			int vbo_offset = region->offset_in_numbers + batch_start;
+
+			model->load_instance_buffer(
+				reinterpret_cast<float*>(staging.data()),  // mat4 data
+				static_cast<unsigned int>(staging.size()), // number of mat4s
+				attrib_index,
+				region,
+				static_cast<unsigned int>(batch_start)           // offset within region
+			);
+
+			staging.clear();
+			batch_start = -1;
+		};
+
+		for (int i = 0; i < region_size; i++)
+		{
+			void* ptr = region->object_ptrs[i];
+
+			if (ptr == nullptr)
+			{
+				flush_batch();
+				continue;
+			}
+
+			// Cast void* back to game_object_basic — safe because only
+			// game_object_basic instances ever write into object_ptrs
+			game_object_basic* obj = static_cast<game_object_basic*>(ptr);
+
+			if (!obj->is_pos_changed_flag)
+			{
+				flush_batch();
+				continue;
+			}
+
+			// Pull world matrix from EnTT
+			TransformComponent& tc = obj->registry.get<TransformComponent>(obj->this_object);
+
+			if (batch_start == -1)
+				batch_start = i; // start a new batch here
+
+			staging.push_back(tc.world);
+			obj->is_pos_changed_flag = false; // reset flag after queuing for upload
+		}
+
+		flush_batch(); // flush any trailing batch
+	}
+
+	//-----------------------------------------------------------------------------------------
+
 	entt::entity this_object;
 	entt::registry& registry;
+
+	int region_slot_index = -1; // this objects slot in region->object_ptrs
 
 	TransformComponent& get_transform_ref()
 	{
 		return registry.get<TransformComponent>(this_object);
 	}
+
+	static game_object_basic* from_region_ptr(void* ptr)
+	{
+		return static_cast<game_object_basic<Derived>*>(ptr);
+	}
+
+protected:
 
 	bool is_pos_changed_flag = false;
 	bool is_any_child_pos_changed_flag = false;
@@ -41,8 +172,6 @@ private:
 		trigger_child_pos_changed_flag();
 	}
 
-	std::shared_ptr<class_region> Transform_region;
-
 	void tick_transforms(const glm::mat4 parent_transform)
 	{
 		TransformComponent& this_transform = get_transform_ref();
@@ -63,55 +192,83 @@ private:
 
 		}
 
-		ChildComponent& childs = registry.get<ChildComponent>(this_object);
+		ChildComponent* childs = registry.try_get<ChildComponent>(this_object);
 
-		for (game_object_basic* child : childs.children)
+		if (childs != nullptr)
 		{
-			if (is_pos_changed_flag)
-				child->is_pos_changed_flag = true;
+			for (game_object_basic* child : childs->children)
+			{
+				if (is_pos_changed_flag)
+					child->is_pos_changed_flag = true;
 
-			else if (!child->is_any_child_pos_changed_flag)
-				continue;
+				else if (!child->is_any_child_pos_changed_flag)
+					continue;
 
-			child->tick_transforms(this_transform.world);
+				child->tick_transforms(this_transform.world);
+			}
 		}
+		
+		is_any_child_pos_changed_flag = false;
 
 	}
-public:
-
-	game_object_basic(entt::registry& registry, const std::string& tag = "Undefined tag", const std::shared_ptr<class_region> Transform_region = nullptr,
-		 TransformComponent& transform = TransformComponent(), const game_object_basic* parent_object = nullptr)
-		: registry(registry), Transform_region(Transform_region)
+	
+	game_object_basic(entt::registry& registry, const std::string& tag = "Undefined tag",
+		TransformComponent& transform = TransformComponent(), const game_object_basic* parent_object = nullptr)
+		: registry(registry)
 	{
 		this_object = registry.create();
 		
+		registry.emplace<Self_component>(this_object, this);
+		
 		registry.emplace<TagComponent>(this_object, tag);
 
+		registry.emplace<TransformComponent>(this_object, transform);
+		
 		if(parent_object != nullptr)
 		{
 			registry.emplace<ParentComponent>(this_object, parent_object->this_object);
 			registry.get_or_emplace<ChildComponent>(parent_object->this_object).children.push_back(this);
 		}
 
-		registry.emplace<Self_component>(this_object, this);
+		if(region != nullptr)
+		{
+			for(int i=0; i<region->object_ptrs.size(); ++i)
+			{
+				if(region->object_ptrs[i] == nullptr)
+				{
+					region->object_ptrs[i] = this;
+					region_slot_index = i;
+					break;
+				}
+			}
+			if(region_slot_index < 0)
+			{
+				if(region->object_ptrs.size() < region->size_in_number)
+				{
+					region->object_ptrs.push_back(this);
+					region_slot_index = region->object_ptrs.size() - 1;
+				}
+				else
+				{
+					LOG_ERROR("Game_object_basic, There is not enougf space in region, object Cant be Created.");
+				}
+			}
+		}
 
-		registry.emplace<TransformComponent>(this_object, transform);
+		trigger_pos_changed_flags();
 	};
+
+	~game_object_basic()
+	{
+		if (region && region_slot_index >= 0)
+			region->object_ptrs[region_slot_index] = nullptr;
+	}
+
+public:
 
 	TransformComponent get_transform_copy()
 	{
 		return get_transform_ref();
-	}
-
-	void static Tick(entt::registry& registry)
-	{
-		auto group = registry.group<TransformComponent, Self_component>(entt::get<>, entt::exclude<ParentComponent>);
-
-		group.each([](auto entity, TransformComponent& transform, Self_component& self)
-		{
-			self.this_object->tick_transforms(glm::mat4(1.0f));
-		});
-
 	}
 
 	//---set transforms-----------------------------------------------------------------------
@@ -152,4 +309,40 @@ public:
 		trigger_pos_changed_flags();
 	}
 
+	//--- upload/change model--------------------------------------------------------------------
+
+	static void set_model(game_object_basic_model* new_model ,const unsigned int region_size ,const int transform_attrib_index = 3)
+	{
+		model = new_model;
+
+		if (new_model != nullptr)
+		{
+			region = model->reserve_class_region(region_size);
+			region->object_ptrs.assign(region_size, nullptr);
+			attrib_index = transform_attrib_index;
+		}
+		else
+		{
+			region = nullptr;
+			attrib_index = -1;
+		}
+	}
+
+	//you can call it with a negative to make it smaller
+	static int expand_region(const int additional_size)
+	{
+		if (model == nullptr || region == nullptr)
+		{
+			LOG_WARNING("Game_object_basic: cant expand region, there is no defined model or region!")
+			return -1;
+		}
+		if(additional_size + region->size_in_number < 0)
+		{
+			LOG_WARNING("Game_object_basic: cant shrink region below 0!")
+			return -1;
+		}
+			
+		model->reserve_additional_region(additional_size + region->size_in_number, region);
+		return additional_size + region->size_in_number;
+	}
 };

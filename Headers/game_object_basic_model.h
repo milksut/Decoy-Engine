@@ -478,8 +478,9 @@ private:
 		/// <param name="region">[in] Class region describing memory layout.</param>
 		/// <param name="data_offset_by_attrib_size">[in] Offset in attribute units (default = 0).</param>
 		void load_instance_buffer(float* data, unsigned int amount_in_attrib_size, int attrib_index,
-			std::shared_ptr<class_region> region, float data_offset_by_attrib_size = 0)
+			std::shared_ptr<class_region> region, unsigned int data_offset_by_attrib_size = 0)
 		{
+			//TODO: log the errors.
 			if (attrib_index >= VAO_MAX_ATTRIB_AMOUNT || attrib_index <= 2)
 				return; // Invalid or mesh's attribute index
 
@@ -845,7 +846,7 @@ public:
 	/// <param name="region">[in] Class region describing memory layout.</param>
 	/// <param name="data_offset_by_attrib_size">[in] Offset in attribute units (default = 0).</param>
 	void load_instance_buffer(float* data, unsigned int amount_in_attrib_size, int attrib_index,
-		std::shared_ptr<class_region> region, float data_offset_by_attrib_size = 0)
+		std::shared_ptr<class_region> region, unsigned int data_offset_by_attrib_size = 0)
 	{
 		for (std::shared_ptr<Mesh> pointer : Meshes)
 		{
