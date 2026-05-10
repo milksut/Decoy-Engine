@@ -7,7 +7,7 @@
 
 #include "Input_Manager.h"
 #include "The_event_manager.h"
-
+#include "Headers/game_object_basic.h"
 
 bool camera_control = false;
 
@@ -23,6 +23,13 @@ Event_manager manager;
 Input_Manager* input_manager;
 
 
+
+class Tree : public game_object_basic<Tree> {
+public:
+	Tree(entt::registry& reg, const std::string& tag, game_object_basic* parent = nullptr)
+		: game_object_basic(reg, tag, parent) {
+	}
+};
 
 TextRenderer* printer;
 camera_test* camera;
@@ -179,11 +186,13 @@ int main()
 	int grid_amount = 10;
 	//-*-*-*-*-*-*-*-**-*-*-*-*-**-*-*-*-*-*-*-*-*-*-*-*-*-*-*-**-*-*-*-*-*-*-*-*
 
-	std::shared_ptr<class_region> grid_region = backpack.reserve_class_region(grid_amount * grid_amount);
 
+	std::shared_ptr<class_region> grid_region = backpack.reserve_class_region(grid_amount * grid_amount);
+	
 	backpack.add_instance_buffer(16, 3); //attrib size-mat4-16floats, attrib index, for model
 
 	backpack.add_instance_buffer(9, 7); //attrib size-mat3-12floats, attrib index, for transpose_inverse_viewXmodel
+
 
 
 	std::vector<glm::mat4> model_matrices_grid;
@@ -199,7 +208,11 @@ int main()
 		}
 
 	}
-		
+	
+	grid_region->data_ptrs[3] = std::shared_ptr<float>((float*)model_matrices_grid.data(), [](float*) {});
+	grid_region->data_amount[3] = model_matrices_grid.size() * 16;
+
+
 	backpack.load_instance_buffer((float*)model_matrices_grid.data(), model_matrices_grid.size(), 3, grid_region);
 	Logger::checkGLError("After loading models");
 
@@ -215,8 +228,13 @@ int main()
 		}
 	}
 
+	grid_region->data_ptrs[7] = std::shared_ptr<float>((float*)transpose_inverse_model_matrices_grid.data(), [](float*) {});
+	grid_region->data_amount[7] = transpose_inverse_model_matrices_grid.size() * 9;
+	
+
 	backpack.load_instance_buffer((float*)transpose_inverse_model_matrices_grid.data(), transpose_inverse_model_matrices_grid.size(), 7, grid_region);
 	Logger::checkGLError("After loading transpose_inverse");
+
 
 	Light sun = {false, glm::vec3(0.0), glm::vec3(0.0,-1.0,0.0), glm::vec3(1.0,1.0,1.0), glm::vec3(5.0,5.0,5.0), glm::vec3(0.5f,0.5f,0.5f),0,0,0,0,0};
 	
@@ -240,6 +258,19 @@ int main()
 	shader.setFloat("lights[0].quadratic", sun.quadratic);
 
 	Logger::checkGLError("After loading light");
+
+	
+	Tree::set_model(&backpack, 100, 3);
+	entt::registry registry;
+
+	for (int i = 0; i < grid_amount; i++)
+	{
+		for (int j = 0; j < grid_amount; j++)
+		{
+			Tree* t = new Tree(registry, "Tree_" + std::to_string(i) + "_" + std::to_string(j));
+			t->set_position({ i * 5.0f, 5.0f, j * 5.0f });
+		}
+	}
 
 	//-------------------------------------------------------------------------------------------------------------
 	input_manager = new Input_Manager(manager,window);
@@ -370,6 +401,8 @@ int main()
 
 	while (!glfwWindowShouldClose(window))
 	{
+
+		game_object_base::Tick(registry);
 		camera_control = glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_RIGHT) == GLFW_PRESS;
 
 		processInput(window, 0.1 * ((glfwGetTime() - time_of_last_frame) / Target_frame_time), camera);
@@ -382,6 +415,9 @@ int main()
 		shader.setVec3("viewPos", camera->camera_position);
 		
 		backpack.draw(shader, grid_region, grid_amount * grid_amount);
+
+		//Tree::draw(shader);
+
 		Logger::checkGLError("After drawing grid backpack");
 
 		x++;

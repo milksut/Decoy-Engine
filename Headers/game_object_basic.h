@@ -8,10 +8,19 @@
 #include "Components/TagComponent.h"
 #include "Components/TransformComponent.h"
 
+
+
 //this class is for calling transform upload with each derived classes own static class region
 class game_object_base
 {
 public:
+
+	virtual void set_is_pos_changed_flag(bool val) = 0;
+	virtual bool get_is_pos_changed_flag() = 0;
+	virtual void set_is_any_child_pos_changed_flag(bool val) = 0;
+	virtual bool get_is_any_child_pos_changed_flag() = 0;
+	virtual void tick_transforms(const glm::mat4) = 0;
+	virtual void trigger_child_pos_changed_flag() = 0;
 
 void static Tick(entt::registry& registry)
 {
@@ -19,7 +28,7 @@ void static Tick(entt::registry& registry)
 
 	group.each([](auto entity, TransformComponent& transform, Self_component& self)
 	{
-		self.this_object->tick_transforms(glm::mat4(1.0f));
+		static_cast<game_object_base*>(self.this_object)->tick_transforms(glm::mat4(1.0f));
 	});
 
 	upload_all_transforms();
@@ -152,17 +161,17 @@ protected:
 	bool is_any_child_pos_changed_flag = false;
 
 	//TODO: renamke this to prevent miss use
-	void trigger_child_pos_changed_flag()
+	void trigger_child_pos_changed_flag() override
 	{
 		is_any_child_pos_changed_flag = true;
 		ParentComponent* comp = registry.try_get<ParentComponent>(this_object);
 
 		if(comp != nullptr)
 		{
-			if(comp->parent->is_any_child_pos_changed_flag)
+			if(static_cast<game_object_base*>(comp->parent)->get_is_any_child_pos_changed_flag())
 				return;
 			else
-				comp->parent->trigger_child_pos_changed_flag();
+				static_cast<game_object_base*>(comp->parent)->trigger_child_pos_changed_flag();
 		}
 	}
 
@@ -172,7 +181,28 @@ protected:
 		trigger_child_pos_changed_flag();
 	}
 
-	void tick_transforms(const glm::mat4 parent_transform)
+	void set_is_pos_changed_flag(bool val) override
+	{
+		is_pos_changed_flag = val;
+	}
+
+	bool get_is_pos_changed_flag() override
+	{
+		return is_pos_changed_flag;
+	}
+
+	void set_is_any_child_pos_changed_flag(bool val) override
+	{
+		is_any_child_pos_changed_flag = val;
+	}
+
+	bool get_is_any_child_pos_changed_flag() override
+	{
+		return is_any_child_pos_changed_flag;
+	}
+
+
+	void tick_transforms(const glm::mat4 parent_transform) override
 	{
 		TransformComponent& this_transform = get_transform_ref();
 
@@ -196,38 +226,40 @@ protected:
 
 		if (childs != nullptr)
 		{
-			for (game_object_basic* child : childs->children)
+			for (void* child_ptr : childs->children)
 			{
-				if (is_pos_changed_flag)
-					child->is_pos_changed_flag = true;
+				game_object_base* child = static_cast<game_object_base*>(child_ptr);
 
-				else if (!child->is_any_child_pos_changed_flag)
+				if (is_pos_changed_flag)
+					child->set_is_pos_changed_flag(true);
+
+				else if (!child->get_is_any_child_pos_changed_flag())
 					continue;
 
 				child->tick_transforms(this_transform.world);
 			}
 		}
 		
-		is_any_child_pos_changed_flag = false;
+		set_is_any_child_pos_changed_flag(false);
 
 	}
 	
 	game_object_basic(entt::registry& registry, const std::string& tag = "Undefined tag",
-		TransformComponent& transform = TransformComponent(), const game_object_basic* parent_object = nullptr)
+		game_object_basic* parent_object = nullptr, TransformComponent& transform = TransformComponent())
 		: registry(registry)
 	{
 		this_object = registry.create();
 		
-		registry.emplace<Self_component>(this_object, this);
+		registry.emplace<Self_component>(this_object, static_cast<void*>(this));
 		
 		registry.emplace<TagComponent>(this_object, tag);
 
-		registry.emplace<TransformComponent>(this_object, transform);
+		registry.emplace<TransformComponent>(this_object) = transform;
 		
 		if(parent_object != nullptr)
 		{
-			registry.emplace<ParentComponent>(this_object, parent_object->this_object);
-			registry.get_or_emplace<ChildComponent>(parent_object->this_object).children.push_back(this);
+			registry.emplace<ParentComponent>(this_object, static_cast<void*>(parent_object));
+			registry.get_or_emplace<ChildComponent>(parent_object->this_object).children.push_back(static_cast<void*>(this));
 		}
 
 		if(region != nullptr)
@@ -344,5 +376,27 @@ public:
 			
 		model->reserve_additional_region(additional_size + region->size_in_number, region);
 		return additional_size + region->size_in_number;
+	}
+
+	//--- draw -----------------------------------------------------------------------------------
+	static int draw(Shader& shader, int amount = -1)
+	{
+		if (model == nullptr)
+		{
+			LOG_WARNING("Game_object_basic: cant draw, there is no defined model!");
+			return -1;
+		}
+
+		if(amount < 0)
+			amount = region->size_in_number;
+
+		else if (amount > region->size_in_number)
+		{
+			LOG_WARNING("Game_object_basic: draw amount is bigger than region size, drawing only region size!");
+			amount = region->size_in_number;
+		}
+
+		model->draw(shader, region, amount);
+		return 0;
 	}
 };
