@@ -36,20 +36,20 @@ void static Tick(entt::registry& registry)
 }
 
 protected:
-	static std::vector<std::function<void()>>& get_registry()
+	static std::vector<std::function<void()>>& get_func_registry()
 	{
-		static std::vector<std::function<void()>> registry;
-		return registry;
+		static std::vector<std::function<void()>> func_registry;
+		return func_registry;
 	}
 
 	static void register_upload_transform(std::function<void()> fn)
 	{
-		get_registry().push_back(std::move(fn));
+		get_func_registry().push_back(std::move(fn));
 	}
 
 	static void upload_all_transforms()
 	{
-		for (auto& fn : get_registry())
+		for (auto& fn : get_func_registry())
 			fn();
 	}
 };
@@ -345,6 +345,8 @@ public:
 
 	static void set_model(game_object_basic_model* new_model ,const unsigned int region_size ,const int transform_attrib_index = 3)
 	{
+		(void)registerer;
+
 		model = new_model;
 
 		if (new_model != nullptr)

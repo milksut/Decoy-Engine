@@ -193,7 +193,7 @@ int main()
 
 	backpack.add_instance_buffer(9, 7); //attrib size-mat3-12floats, attrib index, for transpose_inverse_viewXmodel
 
-	Tree::set_model(&backpack, 100, 3);
+	
 
 	std::vector<glm::mat4> model_matrices_grid;
 	model_matrices_grid.reserve(grid_amount * grid_amount);
@@ -259,13 +259,13 @@ int main()
 
 	Logger::checkGLError("After loading light");
 
-	
+	Tree::set_model(&backpack, 100, 3);
 	
 	for (int i = 0; i < grid_amount; i++)
 	{
 		for (int j = 0; j < grid_amount; j++)
 		{
-			Tree* t = new Tree(registry, "Tree_" + std::to_string(i) + "_" + std::to_string(j));
+			Tree* t = new Tree(global_registry, "Tree_" + std::to_string(i) + "_" + std::to_string(j));
 			t->set_position({ i * 5.0f, 15.0f, j * 5.0f });
 		}
 	}
@@ -397,10 +397,11 @@ int main()
 
 	shader.bind_UBO("projectionXview_block",camera->Ubo_slot);
 
+	
 	while (!glfwWindowShouldClose(window))
 	{
 
-		game_object_base::Tick(registry);
+		game_object_base::Tick(global_registry);
 		camera_control = glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_RIGHT) == GLFW_PRESS;
 
 		processInput(window, 0.1 * ((glfwGetTime() - time_of_last_frame) / Target_frame_time), camera);
@@ -412,7 +413,7 @@ int main()
 		shader.use();
 		shader.setVec3("viewPos", camera->camera_position);
 		
-		//backpack.draw(shader, grid_region, grid_amount * grid_amount);
+		backpack.draw(shader, grid_region, grid_amount * grid_amount);
 
 		Tree::draw(shader);
 

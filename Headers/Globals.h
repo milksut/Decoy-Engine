@@ -124,7 +124,7 @@ enum Key_state
 //Global variables-------------------------------------------------------------------------------
 	unsigned int draw_call_count = 0; //to track how many draw calls are made per frame
 	unsigned int tick_count = 0; //to track how many ticks are made per second
-	entt::registry registry; //global entity registry for entt
+	entt::registry global_registry; //global entity registry for entt
 //end of global variables------------------------------------------------------------------------
 
 
