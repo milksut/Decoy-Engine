@@ -27,7 +27,8 @@ Input_Manager* input_manager;
 class Tree : public game_object_basic<Tree> {
 public:
 	Tree(entt::registry& reg, const std::string& tag, game_object_basic* parent = nullptr)
-		: game_object_basic(reg, tag, parent) {
+		: game_object_basic(reg, tag, parent)
+	{
 	}
 };
 
@@ -178,7 +179,6 @@ int main()
 		"Shaders/Fragment_shaders/Loaded_model_fragment.frag");
 
 	game_object_basic_model backpack;
-	//backpack.import_model_from_file("C:\\Users\\altay\\Desktop\\pull_from_this_easy\\Backpack.obj");
 
 	backpack.import_model_from_file("Models/Tree1.obj");
 	
@@ -193,7 +193,7 @@ int main()
 
 	backpack.add_instance_buffer(9, 7); //attrib size-mat3-12floats, attrib index, for transpose_inverse_viewXmodel
 
-
+	Tree::set_model(&backpack, 100, 3);
 
 	std::vector<glm::mat4> model_matrices_grid;
 	model_matrices_grid.reserve(grid_amount * grid_amount);
@@ -260,15 +260,13 @@ int main()
 	Logger::checkGLError("After loading light");
 
 	
-	Tree::set_model(&backpack, 100, 3);
-	entt::registry registry;
-
+	
 	for (int i = 0; i < grid_amount; i++)
 	{
 		for (int j = 0; j < grid_amount; j++)
 		{
 			Tree* t = new Tree(registry, "Tree_" + std::to_string(i) + "_" + std::to_string(j));
-			t->set_position({ i * 5.0f, 5.0f, j * 5.0f });
+			t->set_position({ i * 5.0f, 15.0f, j * 5.0f });
 		}
 	}
 
@@ -414,9 +412,9 @@ int main()
 		shader.use();
 		shader.setVec3("viewPos", camera->camera_position);
 		
-		backpack.draw(shader, grid_region, grid_amount * grid_amount);
+		//backpack.draw(shader, grid_region, grid_amount * grid_amount);
 
-		//Tree::draw(shader);
+		Tree::draw(shader);
 
 		Logger::checkGLError("After drawing grid backpack");
 

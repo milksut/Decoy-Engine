@@ -245,7 +245,7 @@ protected:
 	}
 	
 	game_object_basic(entt::registry& registry, const std::string& tag = "Undefined tag",
-		game_object_basic* parent_object = nullptr, TransformComponent& transform = TransformComponent())
+		game_object_basic* parent_object = nullptr, TransformComponent transform = TransformComponent())
 		: registry(registry)
 	{
 		this_object = registry.create();
@@ -254,7 +254,7 @@ protected:
 		
 		registry.emplace<TagComponent>(this_object, tag);
 
-		registry.emplace<TransformComponent>(this_object) = transform;
+		registry.emplace<TransformComponent>(this_object, transform);
 		
 		if(parent_object != nullptr)
 		{
@@ -365,12 +365,12 @@ public:
 	{
 		if (model == nullptr || region == nullptr)
 		{
-			LOG_WARNING("Game_object_basic: cant expand region, there is no defined model or region!")
+			LOG_WARNING("Game_object_basic: cant expand region, there is no defined model or region!");
 			return -1;
 		}
 		if(additional_size + region->size_in_number < 0)
 		{
-			LOG_WARNING("Game_object_basic: cant shrink region below 0!")
+			LOG_WARNING("Game_object_basic: cant shrink region below 0!");
 			return -1;
 		}
 			
