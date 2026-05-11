@@ -26,7 +26,7 @@ void static Tick(entt::registry& registry)
 {
 	auto group = registry.group<TransformComponent, Self_component>(entt::get<>, entt::exclude<ParentComponent>);
 
-	group.each([](auto entity, TransformComponent& transform, Self_component& self)
+	group.each([](auto /*entity*/, TransformComponent& /*transform*/, Self_component& self)
 	{
 		static_cast<game_object_base*>(self.this_object)->tick_transforms(glm::mat4(1.0f));
 	});
@@ -92,10 +92,6 @@ private:
 			if (batch_start == -1 || staging.empty())
 				return;
 
-			// offset_in_numbers is the region's start in the full VBO
-			// batch_start is our local index within the region
-			int vbo_offset = region->offset_in_numbers + batch_start;
-
 			model->load_instance_buffer(
 				reinterpret_cast<float*>(staging.data()),  // mat4 data
 				static_cast<unsigned int>(staging.size()), // number of mat4s
@@ -103,6 +99,7 @@ private:
 				region,
 				static_cast<unsigned int>(batch_start)           // offset within region
 			);
+
 			staging.clear();
 
 			if(transpose_inverse_transform_attrib_index >= 0)
@@ -298,11 +295,11 @@ protected:
 				if(region->object_ptrs.size() < region->size_in_number)
 				{
 					region->object_ptrs.push_back(this);
-					region_slot_index = region->object_ptrs.size() - 1;
+					region_slot_index = (int)region->object_ptrs.size() - 1;
 				}
 				else
 				{
-					LOG_ERROR("Game_object_basic, There is not enougf space in region, object Cant be Created.");
+					LOG_ERROR("Game_object_basic, There is not enough space in region, object Cant be Created.");
 				}
 			}
 		}
@@ -411,7 +408,7 @@ public:
 	}
 
 	//--- draw -----------------------------------------------------------------------------------
-	static int draw(Shader& shader, int amount = -1)
+	static int draw(Shader& shader,unsigned int amount = 0)
 	{
 		if (model == nullptr)
 		{
@@ -419,7 +416,7 @@ public:
 			return -1;
 		}
 
-		if(amount < 0)
+		if(amount <= 0)
 			amount = region->size_in_number;
 
 		else if (amount > region->size_in_number)

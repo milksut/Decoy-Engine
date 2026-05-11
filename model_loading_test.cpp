@@ -15,8 +15,8 @@ const double Target_fps = 144;
 const double Target_frame_time = 1.0 / Target_fps;
 const bool enable_vSync = false;
 
-const unsigned int width = 800, height = 600;
-const float aspect_ratio = (float)width / (float)height;
+const unsigned int screen_width = 800, screen_height = 600;
+const float aspect_ratio = (float)screen_width / (float)screen_height;
 
 
 Event_manager manager;
@@ -33,27 +33,14 @@ public:
 };
 
 TextRenderer* printer;
-camera_test* camera;
-void framebuffer_size_callback(GLFWwindow* window, int width, int height)
+camera_test* fps_camera;
+void framebuffer_size_callback(GLFWwindow* /*window*/, int width, int height)
 {
-	//// make sure the viewport matches the new window dimensions; note that width and 
-	//// height will be significantly larger than specified on retina displays.
 	const float new_aspect_ratio = (float)width / (float)height;
-	//if (new_aspect_ratio < aspect_ratio)
-	//{
-	//	//if the new aspect ratio is smaller than the original one, we need to adjust the viewport
-	//	int new_height = (int)(width / aspect_ratio);
-	//	glViewport(0, (height - new_height) / 2, width, new_height);
-	//}
-	//else
-	//{
-	//	//if the new aspect ratio is larger than the original one, we need to adjust the viewport
-	//	int new_width = (int)(height * aspect_ratio);
-	//	glViewport((width - new_width) / 2, 0, new_width, height);
-	//}
+
 	glViewport(0, 0, width, height);
 
-	camera->update_projection(45.0f, new_aspect_ratio, 0.1f, 1000.0f);
+	fps_camera->update_projection(45.0f, new_aspect_ratio, 0.1f, 1000.0f);
 	printer->change_screen_size(width, height);
 }
 
@@ -150,7 +137,7 @@ void processInput(GLFWwindow* window, float camera_speed, camera_test* camera)
 int main()
 {
 	glfwInit();
-	GLFWwindow* window = init_window(width, height, "Shader Tester");
+	GLFWwindow* window = init_window(screen_width, screen_height, "Shader Tester");
 	glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
 
 	if (!window) {
@@ -158,12 +145,12 @@ int main()
 	}
 
 	glfwSwapInterval(enable_vSync);
-	camera = new camera_test(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 0.0f));
-	camera->update_projection(45.0f, aspect_ratio, 0.1f, 1000.0f);
+	fps_camera = new camera_test(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 0.0f));
+	fps_camera->update_projection(45.0f, aspect_ratio, 0.1f, 1000.0f);
 
 	printer = new TextRenderer("Textures/Font_texture_Atlas/DejaVu Sans Mono_512X256_16x32.png",
 		"Textures/Font_texture_Atlas/DejaVu Sans Mono_512X256_16x32.txt",
-		width, height, 16, 32,
+		screen_width, screen_height, 16, 32,
 		"Shaders/Vertex_shaders/Text_render_vertex.vert",
 		"Shaders/Fragment_shaders/Text_render_fragment.frag",
 		"Shaders/Geometry_shaders/Text_render_geometry.geom",
@@ -210,10 +197,10 @@ int main()
 	}
 	
 	grid_region->data_ptrs[3] = std::shared_ptr<float>((float*)model_matrices_grid.data(), [](float*) {});
-	grid_region->data_amount[3] = model_matrices_grid.size() * 16;
+	grid_region->data_amount[3] = (unsigned int)model_matrices_grid.size() * 16;
 
 
-	backpack.load_instance_buffer((float*)model_matrices_grid.data(), model_matrices_grid.size(), 3, grid_region);
+	backpack.load_instance_buffer((float*)model_matrices_grid.data(), (unsigned int)model_matrices_grid.size(), 3, grid_region);
 	Logger::checkGLError("After loading models");
 
 	std::vector<glm::mat3> transpose_inverse_model_matrices_grid;
@@ -229,10 +216,10 @@ int main()
 	}
 
 	grid_region->data_ptrs[7] = std::shared_ptr<float>((float*)transpose_inverse_model_matrices_grid.data(), [](float*) {});
-	grid_region->data_amount[7] = transpose_inverse_model_matrices_grid.size() * 9;
+	grid_region->data_amount[7] = (unsigned int)transpose_inverse_model_matrices_grid.size() * 9;
 	
 
-	backpack.load_instance_buffer((float*)transpose_inverse_model_matrices_grid.data(), transpose_inverse_model_matrices_grid.size(), 7, grid_region);
+	backpack.load_instance_buffer((float*)transpose_inverse_model_matrices_grid.data(), (unsigned int)transpose_inverse_model_matrices_grid.size(), 7, grid_region);
 	Logger::checkGLError("After loading transpose_inverse");
 
 
@@ -283,10 +270,10 @@ int main()
 
 				if (camera_control)
 				{
-					camera->process_mouse_movement(
-						mouse.mouse_x_offset,
-						mouse.mouse_y_offset,
-						input_manager->mouse_sensitivity
+					fps_camera->process_mouse_movement(
+						(float)mouse.mouse_x_offset,
+						(float)mouse.mouse_y_offset,
+						(float)input_manager->mouse_sensitivity
 					);
 				}
 			}
@@ -294,108 +281,16 @@ int main()
 
 	input_manager->subscribe(Mouse_input, Event_management::Event_type::Mouse_moved, camera_trigger);
 
-	/*/? TEST CODE------------------------------------------------------------------------------------------------------
-	// subscriber that prints mouse movement
-	Event_receiver_shared mouse_receiver = make_receiver([](const Event& e)
-	{
-		if (e.type == Event_type::Mouse_moved)
-		{
-			const auto& mouse = dynamic_cast<const Mouse_move_event&>(e);
-			LOG_INFO("Mouse moved: %f, %f", mouse.mouse_x_offset, mouse.mouse_y_offset);
-			const_cast<Mouse_move_event&>(mouse).is_alive = false; // consume it
-		}
-	});
-
-	input_manager->subscribe(Mouse_input, Event_type::Mouse_moved, mouse_receiver);
-	// Test all keyboard events
-	Event_receiver_shared kb_receiver = make_receiver([](const Event& e)
-		{
-			if (e.type == Event_type::Keyboard_button_pressed)
-			{
-				const auto& ke = dynamic_cast<const Key_press_event&>(e);
-				LOG_INFO("Key PRESSED: %d", ke.key.code);
-			}
-			else if (e.type == Event_type::Keyboard_button_hold)
-			{
-				const auto& ke = dynamic_cast<const Key_hold_event&>(e);
-				LOG_INFO("Key HELD: %d", ke.key.code);
-			}
-			else if (e.type == Event_type::Keyboard_button_released)
-			{
-				const auto& ke = dynamic_cast<const Key_release_event&>(e);
-				LOG_INFO("Key RELEASED: %d", ke.key.code);
-			}
-		});
-	input_manager->subscribe(Keyboard_input, Event_type::Keyboard_button_pressed, kb_receiver);
-	input_manager->subscribe(Keyboard_input, Event_type::Keyboard_button_hold, kb_receiver);
-	input_manager->subscribe(Keyboard_input, Event_type::Keyboard_button_released, kb_receiver);
-
-	// Test mouse buttons
-	Event_receiver_shared mb_receiver = make_receiver([](const Event& e)
-		{
-			if (e.type == Event_type::Mouse_button_pressed)
-			{
-				const auto& me = dynamic_cast<const Mouse_button_press_event&>(e);
-				LOG_INFO("Mouse PRESSED: %d", me.key.code);
-			}
-			else if (e.type == Event_type::Mouse_button_released)
-			{
-				const auto& me = dynamic_cast<const Mouse_button_release_event&>(e);
-				LOG_INFO("Mouse RELEASED: %d", me.key.code);
-			}
-			else if (e.type == Event_type::Mouse_button_hold)
-			{
-				const auto& me = dynamic_cast<const Mouse_button_hold_event&>(e);
-				LOG_INFO("Mouse HELD: %d", me.key.code);
-			}
-		});
-	input_manager->subscribe(Mouse_input, Event_type::Mouse_button_pressed, mb_receiver);
-	input_manager->subscribe(Mouse_input, Event_type::Mouse_button_released, mb_receiver);
-	input_manager->subscribe(Mouse_input, Event_type::Mouse_button_hold, mb_receiver);
-
-	// Test scroll
-	Event_receiver_shared scroll_receiver = make_receiver([](const Event& e)
-		{
-			if (e.type == Event_type::Mouse_scrolled)
-			{
-				const auto& se = dynamic_cast<const Mouse_scroll_event&>(e);
-				LOG_INFO("Scroll: %f, %f", se.x_offset, se.y_offset);
-			}
-		});
-	input_manager->subscribe(Mouse_input, Event_type::Mouse_scrolled, scroll_receiver);
-
-	// Test a combo — G + M
-	input_manager->register_combo({
-		Input_key{ Input_channel::Keyboard_input, GLFW_KEY_G },
-		Input_key{ Input_channel::Keyboard_input, GLFW_KEY_M }
-		});
-	Event_receiver_shared combo_receiver = make_receiver([](const Event& e)
-		{
-			if (e.type == Event_type::Combo_button_pressed)
-				LOG_INFO("Combo_button PRESSED");
-			else if (e.type == Event_type::Combo_button_released)
-				LOG_INFO("Combo_button RELEASED");
-			else if (e.type == Event_type::Combo_button_hold)
-				LOG_INFO("Combo_button HELD");
-		});
-	input_manager->subscribe(Combo_input, Event_type::Combo_button_pressed, combo_receiver);
-	input_manager->subscribe(Combo_input, Event_type::Combo_button_released, combo_receiver);
-	input_manager->subscribe(Combo_input, Event_type::Combo_button_hold, combo_receiver);
-
-	//? END OF TEST CODE-----------------------------------------------------------------------------------------------*/
-
-	//-------------------------------------------------------------------------------------------------------------
-
 	glEnable(GL_DEPTH_TEST); // Enable depth testing for 3D rendering
 	glEnable(GL_CULL_FACE); // Enable face culling to improve performance
 	//glCullFace(GL_FRONT_AND_BACK);
 	glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
-	int x = 0, y = 0, z = 0;
-	double time_of_last_frame = 1;
+	int x = 0, y = 0;
+	double time_of_last_frame = 1.0, z = 0;
 	std::string fps_text = "";
 	glfwSetTime(0.0);
 
-	shader.bind_UBO("projectionXview_block",camera->Ubo_slot);
+	shader.bind_UBO("projectionXview_block",fps_camera->Ubo_slot);
 
 	
 	while (!glfwWindowShouldClose(window))
@@ -404,14 +299,14 @@ int main()
 		game_object_base::Tick(global_registry);
 		camera_control = glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_RIGHT) == GLFW_PRESS;
 
-		processInput(window, 0.1 * ((glfwGetTime() - time_of_last_frame) / Target_frame_time), camera);
+		processInput(window, 0.1f * (float)((glfwGetTime() - time_of_last_frame) / Target_frame_time), fps_camera);
 		time_of_last_frame = glfwGetTime();
 
 		glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 		shader.use();
-		shader.setVec3("viewPos", camera->camera_position);
+		shader.setVec3("viewPos", fps_camera->camera_position);
 		
 		backpack.draw(shader, grid_region, grid_amount * grid_amount);
 
@@ -429,7 +324,7 @@ int main()
 			LOG_INFO("FPS: %d Draw calls per second: %d", y, draw_call_count);
 			draw_call_count = 0;
 		}
-		printer->render_text(fps_text, -1, 0.9, 2.0f);
+		printer->render_text(fps_text, -1.0f, 0.9f, 2.0f);
 		Logger::checkGLError("After drawing fps");
 
 		glfwSwapBuffers(window);

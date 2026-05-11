@@ -35,9 +35,9 @@ private:
 			else
 			{
 				camera_right = glm::normalize(glm::cross(camera_front, world_up));
-				glm::mat4 view = glm::mat4(1.0f);
-				view = glm::rotate(view, glm::radians(camera_angles.z ), camera_front);
-				camera_right = glm::normalize(view * glm::vec4(camera_right, 0.0f));
+				glm::mat4 rotationMat = glm::mat4(1.0f);
+				rotationMat = glm::rotate(rotationMat, glm::radians(camera_angles.z), camera_front);
+				camera_right = glm::normalize(rotationMat * glm::vec4(camera_right, 0.0f));
 			}
 		}
 
