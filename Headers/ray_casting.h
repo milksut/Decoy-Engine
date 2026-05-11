@@ -20,27 +20,57 @@ namespace Ray_casting
     /// <param name="screen_height">[in] Height of the screen/window.</param>
     /// <param name="camera">[in] Camera containing projection and view matrices.</param>
     /// <returns>Normalized world-space ray direction.</returns>
-    glm::vec3 screen_to_world_ray(
-        float mouse_x,
-        float mouse_y,
-        float screen_width,
-        float screen_height,
-        const camera_test& camera
+    glm::vec3  ScreenToWorldRay(
+        float mouseX, float mouseY,
+        float screenWidth, float screenHeight,
+        const glm::mat4& projection,
+        const glm::mat4& view,
+        const glm::vec3& cameraPos)
+    {
+        // 1. NDC
+        float x = (2.0f * mouseX) / screenWidth - 1.0f;
+        float y = 1.0f - (2.0f * mouseY) / screenHeight;
+
+        glm::vec4 rayClip(x, y, -1.0f, 1.0f);
+
+        // 2. Eye space
+        glm::mat4 invProj = glm::inverse(projection);
+        glm::vec4 rayEye = invProj * rayClip;
+        rayEye = glm::vec4(rayEye.x, rayEye.y, -1.0f, 0.0f);
+
+        // 3. World space
+        glm::mat4 invView = glm::inverse(view);
+        glm::vec3 rayDir = glm::normalize(glm::vec3(invView * rayEye));
+
+        return rayDir;
+    }
+
+    float ray_sphere_intersection(
+        const glm::vec3& ray_origin,
+        const glm::vec3& ray_dir,
+        const glm::vec3& sphere_center,
+        float radius
     )
     {
-        // Pixel to NDC
-        float ndc_x = (2.0f * mouse_x) / screen_width - 1.0f;
-        float ndc_y = 1.0f - (2.0f * mouse_y) / screen_height;
+        glm::vec3 oc = ray_origin - sphere_center;
 
-        // NDC to View space
-        glm::vec4 clip = glm::vec4(ndc_x, ndc_y, -1.0f, 1.0f);
-        glm::vec4 view_space = glm::inverse(camera.projection) * clip;
-        view_space.z = -1.0f;
-        view_space.w = 0.0f;
+        float b = 2.0f * glm::dot(oc, ray_dir);
+        float c = glm::dot(oc, oc) - radius * radius;
 
-        // View space to World space
-        glm::vec4 world = glm::inverse(camera.view) * view_space;
+        float discriminant = b * b - 4.0f * c;
 
-        return glm::normalize(glm::vec3(world));
+        if (discriminant < 0.0f)
+            return -1.0f;
+
+        float sqrt_d = sqrt(discriminant);
+
+        float t1 = (-b - sqrt_d) * 0.5f;
+        float t2 = (-b + sqrt_d) * 0.5f;
+
+        if (t1 > 0.0f) return t1;
+        if (t2 > 0.0f) return t2;
+
+        return -1.0f;
     }
+
 }

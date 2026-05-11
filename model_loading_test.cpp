@@ -8,6 +8,7 @@
 #include "Input_Manager.h"
 #include "The_event_manager.h"
 #include "Headers/game_object_basic.h"
+#include "Headers/ray_casting.h"
 
 bool camera_control = false;
 
@@ -22,7 +23,11 @@ const float aspect_ratio = (float)width / (float)height;
 Event_manager manager;
 Input_Manager* input_manager;
 
-
+//-*-*-*-*-*-*-*-**-*-*-*-*-**-*-*-*-*-*-*-*-*-*-*-*-*-*-*-**-*-*-*-*-*-*-*-*
+int grid_amount = 1;
+//-*-*-*-*-*-*-*-**-*-*-*-*-**-*-*-*-*-*-*-*-*-*-*-*-*-*-*-**-*-*-*-*-*-*-*-*
+bool spawnPressed = false;
+std::vector<glm::mat4> model_matrices_grid;
 
 class Tree : public game_object_basic<Tree> {
 public:
@@ -144,6 +149,7 @@ void processInput(GLFWwindow* window, float camera_speed, camera_test* camera)
 		changes[0], changes[1],
 		changes[2], changes[3],
 		changes[4], changes[5]);
+
 }
 
 int main()
@@ -181,10 +187,6 @@ int main()
 	//backpack.import_model_from_file("C:\\Users\\altay\\Desktop\\pull_from_this_easy\\Backpack.obj");
 
 	backpack.import_model_from_file("Models/Tree1.obj");
-	
-	//-*-*-*-*-*-*-*-**-*-*-*-*-**-*-*-*-*-*-*-*-*-*-*-*-*-*-*-**-*-*-*-*-*-*-*-*
-	int grid_amount = 10;
-	//-*-*-*-*-*-*-*-**-*-*-*-*-**-*-*-*-*-*-*-*-*-*-*-*-*-*-*-**-*-*-*-*-*-*-*-*
 
 
 	std::shared_ptr<class_region> grid_region = backpack.reserve_class_region(grid_amount * grid_amount);
@@ -195,7 +197,6 @@ int main()
 
 
 
-	std::vector<glm::mat4> model_matrices_grid;
 	model_matrices_grid.reserve(grid_amount * grid_amount);
 	for (int i = 0; i < grid_amount; i++)
 	{
@@ -260,22 +261,77 @@ int main()
 	Logger::checkGLError("After loading light");
 
 	
-	Tree::set_model(&backpack, 100, 3);
-	entt::registry registry;
+	Tree::set_model(&backpack, 10, 3);
 
 	for (int i = 0; i < grid_amount; i++)
 	{
 		for (int j = 0; j < grid_amount; j++)
 		{
 			Tree* t = new Tree(registry, "Tree_" + std::to_string(i) + "_" + std::to_string(j));
-			t->set_position({ i * 5.0f, 5.0f, j * 5.0f });
+			t->set_position({ i * 5.0f, 0.0f, j * 5.0f });
 		}
 	}
 
 	//-------------------------------------------------------------------------------------------------------------
 	input_manager = new Input_Manager(manager,window);
 
-	
+	Event_management::Event_receiver_shared click_receiver = Event_management::make_receiver([](const Event_management::Event& e)
+		{
+			if (e.type == Event_management::Event_type::Mouse_button_pressed)
+			{
+				const auto& mouse = dynamic_cast<const Mouse_button_press_event&>(e);
+
+				if (mouse.key.code != GLFW_MOUSE_BUTTON_LEFT) return;
+
+
+				entt::entity closest_entity = entt::null;
+				float closest_distance = -1.0f;
+
+				auto view = registry.view<TransformComponent>();
+				view.each([&](entt::entity entity, TransformComponent& transform)
+					{
+
+						glm::vec3 rayDir = Ray_casting::ScreenToWorldRay(
+							mouse.mouse_x,
+							mouse.mouse_y,
+							800,
+							600,
+							camera->projection,
+							camera->view,
+							camera->camera_position
+						);
+
+						float dist = Ray_casting::ray_sphere_intersection(
+							camera->camera_position,
+							rayDir,
+							glm::vec3(transform.position),
+							3.0f
+						);
+
+						if (dist > 0)
+						{
+							if (closest_distance < 0 || dist < closest_distance)
+							{
+								closest_distance = dist;
+								closest_entity = entity;
+							}
+						}
+					});
+
+				if (closest_entity != entt::null)
+				{
+					auto& tag = registry.get<TagComponent>(closest_entity);
+					auto& transform = registry.get<TransformComponent>(closest_entity);
+					LOG_INFO("Selected: %s pos: %.2f, %.2f, %.2f",
+						tag.tag.c_str(),
+						transform.position.x,
+						transform.position.y,
+						transform.position.z);
+				}
+			}
+		});
+
+	input_manager->subscribe(Mouse_input, Event_management::Event_type::Mouse_button_pressed, click_receiver);
 
 	Event_management::Event_receiver_shared camera_trigger = Event_management::make_receiver([](const Event_management::Event& e)
 	{
@@ -414,9 +470,9 @@ int main()
 		shader.use();
 		shader.setVec3("viewPos", camera->camera_position);
 		
-		backpack.draw(shader, grid_region, grid_amount * grid_amount);
+		//backpack.draw(shader, grid_region, grid_amount * grid_amount);
 
-		//Tree::draw(shader);
+		Tree::draw(shader);
 
 		Logger::checkGLError("After drawing grid backpack");
 
@@ -427,7 +483,7 @@ int main()
 			x = 0;
 			z = glfwGetTime();
 			fps_text = "FPS: " + std::to_string(y);
-			LOG_INFO("FPS: %d Draw calls per second: %d", y, draw_call_count);
+			//LOG_INFO("FPS: %d Draw calls per second: %d", y, draw_call_count);
 			draw_call_count = 0;
 		}
 		printer->render_text(fps_text, -1, 0.9, 2.0f);

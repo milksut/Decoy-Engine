@@ -365,12 +365,12 @@ public:
 	{
 		if (model == nullptr || region == nullptr)
 		{
-			LOG_WARNING("Game_object_basic: cant expand region, there is no defined model or region!")
+			LOG_WARNING("Game_object_basic: cant expand region, there is no defined model or region!");
 			return -1;
 		}
 		if(additional_size + region->size_in_number < 0)
 		{
-			LOG_WARNING("Game_object_basic: cant shrink region below 0!")
+			LOG_WARNING("Game_object_basic: cant shrink region below 0!");
 			return -1;
 		}
 			
