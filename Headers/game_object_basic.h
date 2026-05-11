@@ -70,17 +70,20 @@ private:
 	
 	static inline game_object_basic_model* model = nullptr;
 	static inline std::shared_ptr<class_region> region = nullptr;
-	static inline int attrib_index = -1;   // VAO attrib slot for world mat4 (e.g. 3)
-
+	static inline int transform_attrib_index = -1;   // VAO attrib slot for world mat4 (e.g. 3)
+	static inline int transpose_inverse_transform_attrib_index = -1; // VAO attrib slot for transpose inverse world mat4 (e.g. 7)
 	static void tick_upload_transforms()
 	{
-		if (!model || !region || attrib_index < 0)
+		if (!model || !region || transform_attrib_index < 0)
 			return;
 
 		const int region_size = static_cast<int>(region->object_ptrs.size());
 
 		std::vector<glm::mat4> staging;
 		staging.reserve(region_size); // avoid reallocations mid-loop
+
+		std::vector<glm::mat3> staging_inverse;
+		staging_inverse.reserve(region_size); // avoid reallocations mid-loop
 
 		int batch_start = -1; // index in object_ptrs where current batch began
 
@@ -96,12 +99,25 @@ private:
 			model->load_instance_buffer(
 				reinterpret_cast<float*>(staging.data()),  // mat4 data
 				static_cast<unsigned int>(staging.size()), // number of mat4s
-				attrib_index,
+				transform_attrib_index,
 				region,
 				static_cast<unsigned int>(batch_start)           // offset within region
 			);
-
 			staging.clear();
+
+			if(transpose_inverse_transform_attrib_index >= 0)
+			{
+				//same one for transpose inverse
+				model->load_instance_buffer(
+					reinterpret_cast<float*>(staging_inverse.data()),
+					static_cast<unsigned int>(staging_inverse.size()),
+					transpose_inverse_transform_attrib_index,
+					region,
+					static_cast<unsigned int>(batch_start)
+				);
+				staging_inverse.clear();
+			}
+			
 			batch_start = -1;
 		};
 
@@ -132,6 +148,10 @@ private:
 				batch_start = i; // start a new batch here
 
 			staging.push_back(tc.world);
+
+			if(transpose_inverse_transform_attrib_index >= 0)
+				staging_inverse.push_back(glm::transpose(glm::inverse(glm::mat3(tc.world))));
+
 			obj->is_pos_changed_flag = false; // reset flag after queuing for upload
 		}
 
@@ -343,7 +363,15 @@ public:
 
 	//--- upload/change model--------------------------------------------------------------------
 
-	static void set_model(game_object_basic_model* new_model ,const unsigned int region_size ,const int transform_attrib_index = 3)
+	/// <summary>
+	/// 
+	/// </summary>
+	/// <param name="new_model"></param>
+	/// <param name="region_size"></param>
+	/// <param name="transform_attrib_index_in"></param>
+	/// <param name="tranpose_inverse_transform_attrib_index_in">if -1 or smaller, dont upload transpose inverse transform</param>
+	static void set_model(game_object_basic_model* new_model, const unsigned int region_size,
+		int transform_attrib_index_in = 3, int tranpose_inverse_transform_attrib_index_in = 7)
 	{
 		(void)registerer;
 
@@ -353,12 +381,14 @@ public:
 		{
 			region = model->reserve_class_region(region_size);
 			region->object_ptrs.assign(region_size, nullptr);
-			attrib_index = transform_attrib_index;
+			transform_attrib_index = transform_attrib_index_in;
+			transpose_inverse_transform_attrib_index = tranpose_inverse_transform_attrib_index_in;
 		}
 		else
 		{
 			region = nullptr;
-			attrib_index = -1;
+			transform_attrib_index = -1;
+			transpose_inverse_transform_attrib_index = -1;
 		}
 	}
 
