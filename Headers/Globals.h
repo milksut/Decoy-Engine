@@ -260,10 +260,18 @@ namespace Logger
 			va_start(args, format);
 			vsnprintf(buffer, sizeof(buffer), format, args);
 			va_end(args);
+
 			time_t now = time(0);
-			char* dt = ctime(&now);
-			std::string dtStr(dt);
+			char timeBuffer[26];
+
+			#if defined(_MSC_VER) // MSVC / Windows
+						ctime_s(timeBuffer, sizeof(timeBuffer), &now);
+			#else // POSIX
+						ctime_r(&now, timeBuffer);
+			#endif
+			std::string dtStr(timeBuffer);
 			dtStr.pop_back();
+
 			if (level >= console_log_level)
 			{
 				std::cout << getLogLevelColor(level) << dtStr << " [" << getLogLevelString(level) << "] " << "(" << file << ":" << line << ") " << buffer << "\033[0m" << std::endl;
@@ -305,18 +313,25 @@ namespace Logger
 				}
 			}
 
-			time_t now = time(0);
-			tm* ltm = localtime(&now);
+			time_t now = time(nullptr);
+			struct tm tmStruct;
+
+			#if defined(_MSC_VER) // Windows/MSVC
+						localtime_s(&tmStruct, &now);
+			#else // POSIX
+						localtime_r(&now, &tmStruct);
+			#endif
 
 			std::string filename = "Logs/log_" +
-				std::to_string(1900 + ltm->tm_year) + "-" +
-				std::to_string(1 + ltm->tm_mon) + "-" +
-				std::to_string(ltm->tm_mday) + "_" +
-				std::to_string(ltm->tm_hour) + "-" +
-				std::to_string(ltm->tm_min) + "-" +
-				std::to_string(ltm->tm_sec) + ".txt";
+				std::to_string(1900 + tmStruct.tm_year) + "-" +
+				std::to_string(1 + tmStruct.tm_mon) + "-" +
+				std::to_string(tmStruct.tm_mday) + "_" +
+				std::to_string(tmStruct.tm_hour) + "-" +
+				std::to_string(tmStruct.tm_min) + "-" +
+				std::to_string(tmStruct.tm_sec) + ".txt";
 
 			logFile.open(filename);
+
 			if (!logFile.is_open()) {
 				std::cerr << "Failed to open log file!" << std::endl;
 			}

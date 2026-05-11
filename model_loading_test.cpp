@@ -24,7 +24,7 @@ Event_manager manager;
 Input_Manager* input_manager;
 
 //-*-*-*-*-*-*-*-**-*-*-*-*-**-*-*-*-*-*-*-*-*-*-*-*-*-*-*-**-*-*-*-*-*-*-*-*
-int grid_amount = 1;
+int grid_amount = 10;
 //-*-*-*-*-*-*-*-**-*-*-*-*-**-*-*-*-*-*-*-*-*-*-*-*-*-*-*-**-*-*-*-*-*-*-*-*
 bool spawnPressed = false;
 std::vector<glm::mat4> model_matrices_grid;
@@ -173,7 +173,7 @@ int main()
 
 	game_object_basic_model backpack;
 
-	backpack.import_model_from_file("C:\\fire_cube.x");
+	backpack.import_model_from_file("Models\\Tree1.obj");
 
 
 	std::shared_ptr<class_region> grid_region = backpack.reserve_class_region(grid_amount * grid_amount);
@@ -248,14 +248,14 @@ int main()
 	Logger::checkGLError("After loading light");
 
 	
-	Tree::set_model(&backpack, 10, 3);
+	Tree::set_model(&backpack, grid_amount * grid_amount, 3);
 
 	for (int i = 0; i < grid_amount; i++)
 	{
 		for (int j = 0; j < grid_amount; j++)
 		{
 			Tree* t = new Tree(global_registry, "Tree_" + std::to_string(i) + "_" + std::to_string(j));
-			t->set_position({ i * 5.0f, 15.0f, j * 5.0f });
+			t->set_position({ i * 5.0f, 0.0f, j * 5.0f });
 		}
 	}
 
@@ -278,22 +278,11 @@ int main()
 				view.each([&](entt::entity entity, TransformComponent& transform)
 					{
 
-						glm::vec3 rayDir = Ray_casting::ScreenToWorldRay(
-							mouse.mouse_x,
-							mouse.mouse_y,
-							800,
-							600,
-							fps_camera->projection,
-							fps_camera->view,
-							fps_camera->camera_position
-						);
+						glm::vec3 rayDir = Ray_casting::ScreenToWorldRay((float)mouse.mouse_x, (float)mouse.mouse_y,
+							800, 600, fps_camera->projection, fps_camera->view);
 
-						float dist = Ray_casting::ray_sphere_intersection(
-							fps_camera->camera_position,
-							rayDir,
-							glm::vec3(transform.position),
-							3.0f
-						);
+						float dist = Ray_casting::ray_sphere_intersection(fps_camera->camera_position, rayDir,
+							glm::vec3(transform.position), 3.0f);
 
 						if (dist > 0)
 						{
@@ -309,11 +298,9 @@ int main()
 				{
 					auto& tag = global_registry.get<TagComponent>(closest_entity);
 					auto& transform = global_registry.get<TransformComponent>(closest_entity);
-					LOG_INFO("Selected: %s pos: %.2f, %.2f, %.2f",
-						tag.tag.c_str(),
-						transform.position.x,
-						transform.position.y,
-						transform.position.z);
+
+					LOG_INFO("Selected: %s pos: %.2f, %.2f, %.2f", tag.tag.c_str(),
+						transform.position.x, transform.position.y, transform.position.z);
 				}
 			}
 		});

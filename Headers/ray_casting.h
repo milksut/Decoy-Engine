@@ -20,12 +20,8 @@ namespace Ray_casting
     /// <param name="screen_height">[in] Height of the screen/window.</param>
     /// <param name="camera">[in] Camera containing projection and view matrices.</param>
     /// <returns>Normalized world-space ray direction.</returns>
-    glm::vec3  ScreenToWorldRay(
-        float mouseX, float mouseY,
-        float screenWidth, float screenHeight,
-        const glm::mat4& projection,
-        const glm::mat4& view,
-        const glm::vec3& cameraPos)
+    glm::vec3  ScreenToWorldRay(float mouseX, float mouseY, unsigned int screenWidth, unsigned int screenHeight,
+        const glm::mat4& projection, const glm::mat4& view)
     {
         // 1. NDC
         float x = (2.0f * mouseX) / screenWidth - 1.0f;
@@ -45,12 +41,8 @@ namespace Ray_casting
         return rayDir;
     }
 
-    float ray_sphere_intersection(
-        const glm::vec3& ray_origin,
-        const glm::vec3& ray_dir,
-        const glm::vec3& sphere_center,
-        float radius
-    )
+    float ray_sphere_intersection(const glm::vec3& ray_origin, const glm::vec3& ray_dir,
+        const glm::vec3& sphere_center, float radius)
     {
         glm::vec3 oc = ray_origin - sphere_center;
 
