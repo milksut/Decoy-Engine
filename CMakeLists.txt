@@ -15,13 +15,14 @@ if(MSVC)
     # Enable PDB generation for all configs
     add_compile_options(/Zi)
     add_link_options(/DEBUG)
-
+    add_compile_options(/W4)
+    add_compile_options(/w44456)
     set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "${CMAKE_CXX_FLAGS_RELEASE} /O2 /arch:AVX2 /GL")
 else()
     # GCC/Clang
-    set(CMAKE_CXX_FLAGS_DEBUG "-g -O0")
+    set(CMAKE_CXX_FLAGS_DEBUG "-g -O0 -Wshadow")
     set(CMAKE_CXX_FLAGS_RELEASE "-O3 -march=native -flto")
-    set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "-O3 -march=native -g -flto")
+    set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "-O3 -march=native -g -flto -Wshadow")
 endif()
 
 # Use after downloading dependencies to prevent checking each time
@@ -123,9 +124,15 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
     entt
 )
 
-target_include_directories(${PROJECT_NAME} PRIVATE 
+target_include_directories(${PROJECT_NAME} SYSTEM PRIVATE
     ${stb_SOURCE_DIR}
-    "Headers"     # This allows the system to directly find the files inside the headers folder.
+    ${glm_SOURCE_DIR}
+    ${entt_SOURCE_DIR}/single_include
+    ${stb_SOURCE_DIR}
+)
+
+target_include_directories(${PROJECT_NAME} PRIVATE 
+    "Headers"
     .
 )
 

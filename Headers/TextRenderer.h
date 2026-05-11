@@ -46,9 +46,9 @@ private:
 
 
 public:
-	glm::vec4 deleted_colors[8];
-	float tolerances[8];
-	glm::vec4 replace_colors[8];
+	glm::vec4 deleted_colors[8] = {};
+	float tolerances[8] = {};
+	glm::vec4 replace_colors[8] = {};
 	int num_color = 0;
 
 	std::string last_rendered_text = "";
@@ -221,7 +221,7 @@ public:
 			return;
 		}
 
-		int text_size = text.size();
+		int text_size = (int)text.size();
 
 		const float add_advance_per_char_temp = add_advance_per_char <0 ? -1 * add_advance_per_char/2 : 0;
 

@@ -124,16 +124,17 @@ enum Key_state
 //Global variables-------------------------------------------------------------------------------
 	unsigned int draw_call_count = 0; //to track how many draw calls are made per frame
 	unsigned int tick_count = 0; //to track how many ticks are made per second
-	entt::registry registry; //global entity registry for entt
+	entt::registry global_registry; //global entity registry for entt
 //end of global variables------------------------------------------------------------------------
 
 
 
 //Structs----------------------------------------------------------------------------------------
-struct Texture {
-	unsigned int id;
-	TextureType type;
-	std::string path;
+struct Texture
+{
+	unsigned int id = 0;
+	TextureType type = TextureType::DIFFUSE;
+	std::string path = "";
 };
 
 struct vertex_data
@@ -162,8 +163,8 @@ struct Light {
 
 struct class_region //VBO regions given to classes and data inside them
 {
-	int offset_in_numbers;//how many meshes can be drawn before this region
-	int size_in_number;//how many meshes can be drawn using this region
+	unsigned int offset_in_numbers = 0;//how many meshes can be drawn before this region
+	unsigned int size_in_number = 0;//how many meshes can be drawn using this region
 
 	//TODO: pointers will be changed to use EnTT system
 	std::vector<std::shared_ptr<float>> data_ptrs;//datas for this region, vector index -> attribute index, and pointer for data

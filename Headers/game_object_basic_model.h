@@ -223,7 +223,7 @@ private:
 			glDeleteBuffers(1, &VBO_Mesh);
 			glDeleteBuffers(1, &EBO);
 
-			for (attribute id : instance_attributes)
+			for (const attribute& id : instance_attributes)
 				if (id.VBO) glDeleteBuffers(1, &id.VBO);
 			
 			glDeleteVertexArrays(1, &VAO);
@@ -549,7 +549,7 @@ private:
 			}
 			else
 			{
-				glDrawArraysInstanced(GL_POINTS, 0, main_vertices.size(), amount);
+				glDrawArraysInstanced(GL_POINTS, 0, (unsigned int)main_vertices.size(), amount);
 			}
 			draw_call_count++;
 		}
@@ -659,7 +659,7 @@ private:
 			{
 				aiTextureType assimp_type = loop ? Assimp_Tex_Types[i] : Assimp_Tex_Types_2[i];
 
-				for (int j = 0; j < material->GetTextureCount(assimp_type); j++)
+				for (unsigned int j = 0; j < material->GetTextureCount(assimp_type); j++)
 				{
 					Texture* texture;
 					aiString str;
@@ -723,7 +723,7 @@ private:
 					mat_props.index_of_refraction = value;
 
 				if (AI_SUCCESS == material->Get(AI_MATKEY_SHADING_MODEL, illum))
-					mat_props.illumination_model = illum;
+					mat_props.illumination_model = (float)illum;
 			}
 			if (!Material_slots::init_flag)
 			{

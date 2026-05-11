@@ -43,7 +43,7 @@ unsigned int load_image(const char* image_path, int& width, int& height, int& nr
 		//we do this becosue the if image data is not aligned to 4 bytes it throw an error
 		glPixelStorei(GL_UNPACK_ALIGNMENT, packing);
 
-		GLenum format;
+		GLenum format = GL_RGB;
 		switch (nrChannels)
 		{
 		case 1:  format = GL_RED;   break;

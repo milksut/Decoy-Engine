@@ -26,7 +26,7 @@ void static Tick(entt::registry& registry)
 {
 	auto group = registry.group<TransformComponent, Self_component>(entt::get<>, entt::exclude<ParentComponent>);
 
-	group.each([](auto entity, TransformComponent& transform, Self_component& self)
+	group.each([](auto /*entity*/, TransformComponent& /*transform*/, Self_component& self)
 	{
 		static_cast<game_object_base*>(self.this_object)->tick_transforms(glm::mat4(1.0f));
 	});
@@ -36,20 +36,20 @@ void static Tick(entt::registry& registry)
 }
 
 protected:
-	static std::vector<std::function<void()>>& get_registry()
+	static std::vector<std::function<void()>>& get_func_registry()
 	{
-		static std::vector<std::function<void()>> registry;
-		return registry;
+		static std::vector<std::function<void()>> func_registry;
+		return func_registry;
 	}
 
 	static void register_upload_transform(std::function<void()> fn)
 	{
-		get_registry().push_back(std::move(fn));
+		get_func_registry().push_back(std::move(fn));
 	}
 
 	static void upload_all_transforms()
 	{
-		for (auto& fn : get_registry())
+		for (auto& fn : get_func_registry())
 			fn();
 	}
 };
@@ -70,17 +70,20 @@ private:
 	
 	static inline game_object_basic_model* model = nullptr;
 	static inline std::shared_ptr<class_region> region = nullptr;
-	static inline int attrib_index = -1;   // VAO attrib slot for world mat4 (e.g. 3)
-
+	static inline int transform_attrib_index = -1;   // VAO attrib slot for world mat4 (e.g. 3)
+	static inline int transpose_inverse_transform_attrib_index = -1; // VAO attrib slot for transpose inverse world mat4 (e.g. 7)
 	static void tick_upload_transforms()
 	{
-		if (!model || !region || attrib_index < 0)
+		if (!model || !region || transform_attrib_index < 0)
 			return;
 
 		const int region_size = static_cast<int>(region->object_ptrs.size());
 
 		std::vector<glm::mat4> staging;
 		staging.reserve(region_size); // avoid reallocations mid-loop
+
+		std::vector<glm::mat3> staging_inverse;
+		staging_inverse.reserve(region_size); // avoid reallocations mid-loop
 
 		int batch_start = -1; // index in object_ptrs where current batch began
 
@@ -89,19 +92,29 @@ private:
 			if (batch_start == -1 || staging.empty())
 				return;
 
-			// offset_in_numbers is the region's start in the full VBO
-			// batch_start is our local index within the region
-			int vbo_offset = region->offset_in_numbers + batch_start;
-
 			model->load_instance_buffer(
 				reinterpret_cast<float*>(staging.data()),  // mat4 data
 				static_cast<unsigned int>(staging.size()), // number of mat4s
-				attrib_index,
+				transform_attrib_index,
 				region,
 				static_cast<unsigned int>(batch_start)           // offset within region
 			);
 
 			staging.clear();
+
+			if(transpose_inverse_transform_attrib_index >= 0)
+			{
+				//same one for transpose inverse
+				model->load_instance_buffer(
+					reinterpret_cast<float*>(staging_inverse.data()),
+					static_cast<unsigned int>(staging_inverse.size()),
+					transpose_inverse_transform_attrib_index,
+					region,
+					static_cast<unsigned int>(batch_start)
+				);
+				staging_inverse.clear();
+			}
+			
 			batch_start = -1;
 		};
 
@@ -132,6 +145,10 @@ private:
 				batch_start = i; // start a new batch here
 
 			staging.push_back(tc.world);
+
+			if(transpose_inverse_transform_attrib_index >= 0)
+				staging_inverse.push_back(glm::transpose(glm::inverse(glm::mat3(tc.world))));
+
 			obj->is_pos_changed_flag = false; // reset flag after queuing for upload
 		}
 
@@ -245,7 +262,7 @@ protected:
 	}
 	
 	game_object_basic(entt::registry& registry, const std::string& tag = "Undefined tag",
-		game_object_basic* parent_object = nullptr, TransformComponent& transform = TransformComponent())
+		game_object_basic* parent_object = nullptr, TransformComponent transform = TransformComponent())
 		: registry(registry)
 	{
 		this_object = registry.create();
@@ -254,7 +271,7 @@ protected:
 		
 		registry.emplace<TagComponent>(this_object, tag);
 
-		registry.emplace<TransformComponent>(this_object) = transform;
+		registry.emplace<TransformComponent>(this_object, transform);
 		
 		if(parent_object != nullptr)
 		{
@@ -278,11 +295,11 @@ protected:
 				if(region->object_ptrs.size() < region->size_in_number)
 				{
 					region->object_ptrs.push_back(this);
-					region_slot_index = region->object_ptrs.size() - 1;
+					region_slot_index = (int)region->object_ptrs.size() - 1;
 				}
 				else
 				{
-					LOG_ERROR("Game_object_basic, There is not enougf space in region, object Cant be Created.");
+					LOG_ERROR("Game_object_basic, There is not enough space in region, object Cant be Created.");
 				}
 			}
 		}
@@ -343,20 +360,32 @@ public:
 
 	//--- upload/change model--------------------------------------------------------------------
 
-	static void set_model(game_object_basic_model* new_model ,const unsigned int region_size ,const int transform_attrib_index = 3)
+	/// <summary>
+	/// 
+	/// </summary>
+	/// <param name="new_model"></param>
+	/// <param name="region_size"></param>
+	/// <param name="transform_attrib_index_in"></param>
+	/// <param name="tranpose_inverse_transform_attrib_index_in">if -1 or smaller, dont upload transpose inverse transform</param>
+	static void set_model(game_object_basic_model* new_model, const unsigned int region_size,
+		int transform_attrib_index_in = 3, int tranpose_inverse_transform_attrib_index_in = 7)
 	{
+		(void)registerer;
+
 		model = new_model;
 
 		if (new_model != nullptr)
 		{
 			region = model->reserve_class_region(region_size);
 			region->object_ptrs.assign(region_size, nullptr);
-			attrib_index = transform_attrib_index;
+			transform_attrib_index = transform_attrib_index_in;
+			transpose_inverse_transform_attrib_index = tranpose_inverse_transform_attrib_index_in;
 		}
 		else
 		{
 			region = nullptr;
-			attrib_index = -1;
+			transform_attrib_index = -1;
+			transpose_inverse_transform_attrib_index = -1;
 		}
 	}
 
@@ -379,7 +408,7 @@ public:
 	}
 
 	//--- draw -----------------------------------------------------------------------------------
-	static int draw(Shader& shader, int amount = -1)
+	static int draw(Shader& shader,unsigned int amount = 0)
 	{
 		if (model == nullptr)
 		{
@@ -387,7 +416,7 @@ public:
 			return -1;
 		}
 
-		if(amount < 0)
+		if(amount <= 0)
 			amount = region->size_in_number;
 
 		else if (amount > region->size_in_number)
