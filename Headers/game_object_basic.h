@@ -46,9 +46,9 @@ public:
 
 	void static Tick(entt::registry& registry_in)
 	{
-		auto group = registry_in.group<Transform_component>(entt::get<Id_component>, entt::exclude<Parent_component>);
+		auto view = registry_in.view<Transform_component, Id_component>(entt::exclude<Parent_component>);
 
-		group.each([](auto /*entity*/, Transform_component& /*transform*/, Id_component& id_comp)
+		view.each([](auto /*entity*/, Transform_component& /*transform*/, Id_component& id_comp)
 		{
 			Global_object_map::get_object(id_comp.id)->tick_transforms(glm::mat4(1.0f));
 		});
