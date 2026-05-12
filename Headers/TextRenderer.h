@@ -72,12 +72,12 @@ public:
 	/// <param name="image_packing">[in] Pixel alignment for the texture image (default 4)</param>
 	TextRenderer(
 		const char* texture_path, const char* char_set_path,
-		const int screen_width, const int screen_height,
-		const int char_width, const int char_height, 
+		const int screen_width_in, const int screen_height_in,
+		const int char_width_in, const int char_height_in, 
 		const char* vertex_shader_path, const char* fragment_shader_path, const char* geometry_shader_path,
-		const float add_advance_per_char = 0.0f,const int image_packing = 4)
-		: shader(vertex_shader_path, fragment_shader_path), char_width(char_width), char_height(char_height)
-		  , screen_width(screen_width), screen_height(screen_height), add_advance_per_char(add_advance_per_char)
+		const float add_advance_per_char_in = 0.0f,const int image_packing = 4)
+		: shader(vertex_shader_path, fragment_shader_path), char_width(char_width_in), char_height(char_height_in)
+		  , screen_width(screen_width_in), screen_height(screen_height_in), add_advance_per_char(add_advance_per_char_in)
 	{
 		shader.add_geometry_shader(geometry_shader_path);
 

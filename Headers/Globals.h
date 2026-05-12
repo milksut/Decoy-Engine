@@ -738,8 +738,8 @@ namespace Material_slots
 	{
 		material_properties mat_props;
 		unsigned int material_id; //unique id for this material, used for UBO indexing
-		material_warapper(const material_properties& mat_props)
-			:mat_props(mat_props)
+		material_warapper(const material_properties& mat_props_in)
+			:mat_props(mat_props_in)
 		{
 			static unsigned int next_material_id = 1;//THIS IS MUST BE STARTED FROM 1 BECAUSE 0 IS RESERVED FOR NO MATERIAL
 			material_id = next_material_id++;
@@ -1098,10 +1098,10 @@ namespace Event_management
 		/// </summary>
 		/// <param name="timing">[in] Timing of the event (Immediate or Queued).</param>
 		/// <param name="type">[in] Type of the event.</param>
-		Event(const Event_timing timing, const Event_type type)
+		Event(const Event_timing event_timing, const Event_type event_type)
 		{
-			this->timing = timing;
-			this->type = type;
+			this->timing = event_timing;
+			this->type = event_type;
 		}
 
 		/// <summary>
@@ -1110,12 +1110,12 @@ namespace Event_management
 		/// <param name="timing">[in] Timing of the event (Immediate or Queued).</param>
 		/// <param name="target_receiver">[in] The target receiver for this event.</param>
 		/// <param name="type">[in] Type of the event.</param>
-		Event(const Event_timing timing, const Event_receiver_shared& target_receiver, const Event_type type)
+		Event(const Event_timing event_timing, const Event_receiver_shared& target_receiver_in, const Event_type event_type)
 		{
-			this->timing = timing;
-			this->target_receiver = target_receiver;
+			this->timing = event_timing;
+			this->target_receiver = target_receiver_in;
 			this->scope = Event_scope::Targeted;
-			this->type = type;
+			this->type = event_type;
 		}
 
 		virtual void execute() = 0;

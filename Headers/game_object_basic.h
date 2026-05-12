@@ -8,6 +8,17 @@
 #include "Components/Tag_components.h"
 #include "Components/Transform_components.h"
 
+class game_object_base;
+
+namespace Global_object_map
+{
+
+    inline std::unordered_map<unsigned int, game_object_base*> object_list;
+
+    void register_object(game_object_base* obj);
+    void unregister_object(unsigned int id);
+    game_object_base* get_object(unsigned int id); 
+}
 
 //this class is for calling transform upload with each derived classes own static class region
 class game_object_base
@@ -22,9 +33,9 @@ public:
 	virtual void trigger_child_pos_changed_flag() = 0;
 	virtual unsigned int get_id() = 0;
 
-	void static Tick(entt::registry& registry)
+	void static Tick(entt::registry& registry_in)
 	{
-		auto group = registry.group<Transform_component>(entt::get<Id_component>, entt::exclude<Parent_component>);
+		auto group = registry_in.group<Transform_component>(entt::get<Id_component>, entt::exclude<Parent_component>);
 
 		group.each([](auto /*entity*/, Transform_component& /*transform*/, Id_component& id_comp)
 		{
@@ -279,9 +290,9 @@ protected:
 
 	}
 	
-	game_object_basic(entt::registry& registry, const std::string& tag = "Undefined tag",
+	game_object_basic(entt::registry& registry_in, const std::string& tag = "Undefined tag",
 		game_object_basic* parent_object = nullptr, Transform_component transform = Transform_component())
-		: registry(registry)
+		: registry(registry_in)
 	{
 		this_object = registry.create();
 
@@ -471,7 +482,6 @@ public:
 
 namespace Global_object_map
 {
-	inline std::unordered_map<unsigned int, game_object_base*> object_list;
 
 	inline void register_object(game_object_base* obj)
 	{

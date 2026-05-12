@@ -65,10 +65,10 @@ public:
 
 	int Ubo_slot = -1;
 	camera_test(
-		glm::vec3 position = glm::vec3(0.0f, 0.0f, 3.0f),
-		glm::vec3 camera_angles = glm::vec3(0.0f, 0.0f, 0.0f),
-		glm::vec3 world_up = glm::vec3(0.0f, 1.0f, 0.0f))
-		: camera_position(position), camera_angles(camera_angles), world_up(world_up)
+		glm::vec3 position_in = glm::vec3(0.0f, 0.0f, 3.0f),
+		glm::vec3 camera_angles_in = glm::vec3(0.0f, 0.0f, 0.0f),
+		glm::vec3 world_up_in = glm::vec3(0.0f, 1.0f, 0.0f))
+		: camera_position(position_in), camera_angles(camera_angles_in), world_up(world_up_in)
 	{
 		glGenBuffers(1, &Camera_UBO);
 		glBindBuffer(GL_UNIFORM_BUFFER, Camera_UBO);

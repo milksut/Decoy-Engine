@@ -104,7 +104,7 @@ private:
     }
 
 public:
-    Quad_renderer(Shader* shader) : shader(shader) {}
+    Quad_renderer(Shader* shader_in) : shader(shader_in) {}
 
     ~Quad_renderer()
     {

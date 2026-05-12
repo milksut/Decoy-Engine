@@ -61,8 +61,8 @@ public:
     /// </summary>
     /// <param name="event_manager">[in] Reference to the event manager used for input events.</param>
     /// <param name="window">[in] Pointer to the GLFW window used for input callbacks.</param>
-    Input_Manager(Event_manager& event_manager, GLFWwindow* window)
-        : event_manager(event_manager), window(window)
+    Input_Manager(Event_manager& event_manager_in, GLFWwindow* the_window)
+        : event_manager(event_manager_in), window(the_window)
     {
         for(int i=0; i< Input_channel_amount; i++)
         {
@@ -73,16 +73,16 @@ public:
 
         //TODO: when Window class is ready, use window class as user pointer and use input manger from there
         glfwSetWindowUserPointer(window, this);
-        glfwSetCursorPosCallback(window, [](GLFWwindow* window, double x_pos, double y_pos)
+        glfwSetCursorPosCallback(window, [](GLFWwindow* window_in, double x_pos_in, double y_pos_in)
         {
-            const auto self = static_cast<Input_Manager*>(glfwGetWindowUserPointer(window));
-            self->mouse_move_callback(x_pos, y_pos);
+            const auto self = static_cast<Input_Manager*>(glfwGetWindowUserPointer(window_in));
+            self->mouse_move_callback(x_pos_in, y_pos_in);
         });
 
-        glfwSetScrollCallback(window, [](GLFWwindow* window, double x_offset, double y_offset)
+        glfwSetScrollCallback(window, [](GLFWwindow* window_in, double x_offset_in, double y_offset_in)
         {
-            const auto self = static_cast<Input_Manager*>(glfwGetWindowUserPointer(window));
-            self->mouse_scroll_callback(x_offset, y_offset);
+            const auto self = static_cast<Input_Manager*>(glfwGetWindowUserPointer(window_in));
+            self->mouse_scroll_callback(x_offset_in, y_offset_in);
         });
     }
 
