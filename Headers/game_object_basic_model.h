@@ -8,6 +8,7 @@
 #include <assimp/scene.h>
 #include <assimp/postprocess.h>
 
+//TODO: please add logs to this header, most of it just return -1 and dont log anything
 /// <summary>
 ///     Maps internal texture types to Assimp texture types for import processing.
 /// </summary>
@@ -237,8 +238,8 @@ private:
 		}
 
 		///this function is dangerous! don't use if you don't know what you are doing
-		///this function needs to be refactored, dont depend on it. //TODO:
-	
+		///this function needs to be refactored, dont depend on it.
+		//TODO: Split this function into multiple functions for updating vertices, indices and textures separately
 		/// <summary>
 		///     Updates mesh vertex, index, and texture data on the GPU.
 		/// </summary>
@@ -246,18 +247,16 @@ private:
 		/// <param name="indices">[in] New index data for the mesh.</param>
 		/// <param name="textures">[in] New textures associated with the mesh.</param>
 		/// <param name="use_dynamic_draw">[in] If true, uses dynamic draw for buffer updates.</param>
-		void update_mesh(const std::vector<vertex_data> &vertices,const std::vector<unsigned int> &indices,
-			const std::vector<Texture>& textures, bool use_dynamic_draw = false)
+		void update_mesh(const std::vector<vertex_data> &vertices,const std::vector<unsigned int> &indices = std::vector<unsigned int>(),
+			const std::vector<Texture>& textures = std::vector<Texture>(), bool use_dynamic_draw = false)
 		{
-			this->main_vertices = vertices;
-			this->main_indices = indices;
-			this->main_textures = textures;
 
 			glBindVertexArray(VAO);
-			
 
 			if (vertices.size() > 0)
 			{	
+				this->main_vertices = vertices;
+
 				glBindBuffer(GL_ARRAY_BUFFER, VBO_Mesh);
 
 				glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(vertex_data), nullptr,
@@ -274,6 +273,7 @@ private:
 
 			if (indices.size() > 0)
 			{
+				this->main_indices = indices;
 				glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
 
 				glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size() * sizeof(unsigned int), nullptr,
@@ -286,6 +286,15 @@ private:
 			{
 				//printf("Mesh - a mesh updated with empty indices, is this intentional?\n");
 				//yes - it is
+			}
+
+			if(textures.size() > 0)
+			{
+				this->main_textures = textures;
+			}
+			else
+			{
+				//printf("Mesh - a mesh updated with empty textures, is this intentional?\n");
 			}
 		}
 
@@ -408,19 +417,25 @@ private:
 		/// <param name="loop_instance">[in] Instance divisor (default = 1).</param>
 		/// <returns>0 on success, -1 on failure.</returns>
 		int add_instance_buffer(int attrib_size, int attrib_index, int loop_instance = 1)
-		{
-			if(shared_regions.empty())
-				return -1; //no regions to create buffer for
-
+		{			
 			if (!can_override_vbo && instance_attributes[attrib_index].VBO != 0)
 				return -1; //attribute already filled
+
+			if (can_override_vbo && instance_attributes[attrib_index].VBO != 0)
+			{
+				glDeleteBuffers(1, &instance_attributes[attrib_index].VBO);
+				// clear all slots that shared this VBO
+				for (auto& attrib : instance_attributes)
+					if (attrib.VBO == instance_attributes[attrib_index].VBO)
+						attrib = empty_attrib;
+			}
 
 			int index_amount = (attrib_size / 4) + (attrib_size%4 ==0? 0:1);
 
 			if (attrib_index + index_amount -1  >= VAO_MAX_ATTRIB_AMOUNT || attrib_index <= 2)
 				return -1; // Invalid or mesh's attribute index
 			
-			int wanted_amount = shared_regions.back()->offset_in_numbers + shared_regions.back()->size_in_number;
+			int wanted_amount = shared_regions.empty() ? 0 : shared_regions.back()->offset_in_numbers + shared_regions.back()->size_in_number;
 
 			unsigned int attrib_size_bytes = (attrib_size * (unsigned int)sizeof(float));
 			
@@ -558,7 +573,10 @@ private:
 	struct Mesh_Childs
 	{
 		std::vector<std::shared_ptr<Mesh>> Meshes;
-		std::vector<Mesh_Childs*> Childs;
+		std::vector<std::unique_ptr<Mesh_Childs>> Childs;
+		int flattened_index_start = -1;
+		int flattened_index_end = -1;
+
 	};
 
 	/// <summary>
@@ -573,22 +591,34 @@ private:
 	/// <param name="path">[in] File path of the loaded model.</param>
 	void process_node(aiNode* node, const aiScene* scene, Mesh_Childs& parent_mesh,const std::string& path)
 	{
+		int range_start = (int)Meshes.size();
+
 		//process meshes of node
 		for (unsigned int i = 0; i < node->mNumMeshes; i++)
 		{
 			aiMesh* mesh = scene->mMeshes[node->mMeshes[i]];
 			//process mesh
 			std::shared_ptr<Mesh> temp = process_mesh(mesh, scene, path);
+
 			parent_mesh.Meshes.push_back(temp);
 			Meshes.push_back(temp);
+			
 			LOG_INFO("Processed mesh: %s", mesh->mName.C_Str());
 		}
+
 		//process childs
 		for (unsigned int i = 0; i < node->mNumChildren; i++)
 		{
-			Mesh_Childs child_mesh;
-			parent_mesh.Childs.push_back(&child_mesh);
-			process_node(node->mChildren[i], scene, child_mesh, path);
+			std::unique_ptr<Mesh_Childs> child_mesh = std::make_unique<Mesh_Childs>();
+			process_node(node->mChildren[i], scene, *child_mesh, path);
+			parent_mesh.Childs.push_back(std::move(child_mesh));
+		}
+
+		if ((int)Meshes.size() > range_start)
+		{
+			parent_mesh.flattened_index_start = range_start;
+
+			parent_mesh.flattened_index_end = (int)Meshes.size() - 1;
 		}
 	}
 
@@ -740,9 +770,8 @@ private:
 public:
 
 	std::vector<std::shared_ptr<Mesh>> Meshes;//you cant use copy constructor or assignment operator because of Mesh class
-	//so you need to manage meshes throut pointers becouse vectors copy elements when resized
 
-	Mesh_Childs root;
+	std::vector<Mesh_Childs> roots;
 
 	/// <summary>
 	///     Creates a new mesh and adds it to the mesh collection.
@@ -854,6 +883,7 @@ public:
 		}
 	}
 
+	//TODO: fix param
 	/// <summary>
 	///     Imports a 3D model from file using Assimp and builds the mesh hierarchy.
 	/// </summary>
@@ -861,19 +891,80 @@ public:
 	///     Loads scene data, then processes the root node recursively into engine meshes.
 	/// </remarks>
 	/// <param name="path">[in] File path of the model to import.</param>
-	void import_model_from_file(std::string path)
+	int import_model_from_file(std::string path)
 	{
 		Assimp::Importer importer;
 		const aiScene* scene = importer.ReadFile(path, aiProcess_Triangulate | aiProcess_FlipUVs | aiProcess_CalcTangentSpace);
 		if (!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !scene->mRootNode)
 		{
 			LOG_ERROR("Assimp error: %s", importer.GetErrorString());
+			return -1;
 		}
 		else
 		{
-			process_node(scene->mRootNode, scene, root,path);
+			Mesh_Childs new_root;
+			process_node(scene->mRootNode, scene, new_root,path);
+			roots.push_back(std::move(new_root));
+			return (int)roots.size() - 1;
 		}
 
 	}
+
+	void offset_mesh_vertices(const unsigned int mesh_index, const glm::mat4 transform)
+	{
+		if(Meshes.size() <= mesh_index)
+		{
+			LOG_ERROR("Mesh index out of bounds in offset_mesh_vertices");
+			return;
+		}
+
+		std::vector<vertex_data>& vertices = Meshes[mesh_index]->main_vertices;
+		glm::mat3 normal_matrix = glm::transpose(glm::inverse(glm::mat3(transform)));
+
+		for (vertex_data& v : vertices)
+		{
+			//pos
+			glm::vec4 new_pos = glm::vec4(v.position[0], v.position[1], v.position[2], 1.0f);
+			new_pos = transform * new_pos;
+			v.position[0] = new_pos.x;
+			v.position[1] = new_pos.y;
+			v.position[2] = new_pos.z;
+
+			// normal
+			glm::vec3 new_normal = normal_matrix * glm::vec3(v.normal[0], v.normal[1], v.normal[2]);
+			new_normal = glm::normalize(new_normal);
+			v.normal[0] = new_normal.x;
+			v.normal[1] = new_normal.y;
+			v.normal[2] = new_normal.z;
+		}
+
+		Meshes[mesh_index]->update_mesh(vertices);
+	}
+
+	//unneded? maybe just use a for loop?
+	void offset_mesh_vertices(const unsigned int mesh_index_start, const unsigned int mesh_index_end, const glm::mat4 transform)
+	{
+		if (Meshes.size() <= mesh_index_start)
+		{
+			LOG_ERROR("Mesh start index out of bounds in offset_mesh_vertices");
+			return;
+		}
+		else if (Meshes.size() <= mesh_index_end)
+		{
+			LOG_ERROR("Mesh end index out of bounds in offset_mesh_vertices");
+			return;
+		}
+
+		for(unsigned int i = mesh_index_start; i <= mesh_index_end; i++)
+		{
+			offset_mesh_vertices(i, transform);
+		}
+	}
+
+	void offset_mesh_vertices(const glm::mat4 transform)
+	{
+		offset_mesh_vertices((unsigned int)0, (unsigned int)Meshes.size() - 1, transform);
+	}
+
 };
 

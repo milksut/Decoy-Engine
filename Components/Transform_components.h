@@ -2,7 +2,7 @@
 
 #include <glm/glm.hpp>
 
-struct TransformComponent 
+struct Transform_component 
 {
     //the local position,not affected by parent
     glm::vec3 position = glm::vec3(0.0);

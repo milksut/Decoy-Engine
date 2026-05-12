@@ -16,18 +16,16 @@ const double Target_fps = 144;
 const double Target_frame_time = 1.0 / Target_fps;
 const bool enable_vSync = false;
 
-const unsigned int screen_width = 800, screen_height = 600;
+unsigned int screen_width = 800, screen_height = 600;
 const float aspect_ratio = (float)screen_width / (float)screen_height;
 
 
 Event_manager manager;
-Input_Manager* input_manager;
+Input_Manager* my_input_manager;
 
 //-*-*-*-*-*-*-*-**-*-*-*-*-**-*-*-*-*-*-*-*-*-*-*-*-*-*-*-**-*-*-*-*-*-*-*-*
 int grid_amount = 10;
 //-*-*-*-*-*-*-*-**-*-*-*-*-**-*-*-*-*-*-*-*-*-*-*-*-*-*-*-**-*-*-*-*-*-*-*-*
-bool spawnPressed = false;
-std::vector<glm::mat4> model_matrices_grid;
 
 class Tree : public game_object_basic<Tree> {
 public:
@@ -35,6 +33,14 @@ public:
 		: game_object_basic(reg, tag, parent)
 	{
 	}
+};
+
+class Arrow : public game_object_basic<Arrow>
+{
+public:
+	Arrow(entt::registry& reg, const std::string& tag)
+		: game_object_basic(reg, tag)
+	{}
 };
 
 TextRenderer* printer;
@@ -47,6 +53,9 @@ void framebuffer_size_callback(GLFWwindow* /*window*/, int width, int height)
 
 	fps_camera->update_projection(45.0f, new_aspect_ratio, 0.1f, 1000.0f);
 	printer->change_screen_size(width, height);
+
+	screen_width = width;
+	screen_height = height;
 }
 
 bool pressable = true;
@@ -171,59 +180,6 @@ int main()
 	Shader shader("Shaders/Vertex_shaders/Loaded_model_vertex.vert",
 		"Shaders/Fragment_shaders/Loaded_model_fragment.frag");
 
-	game_object_basic_model backpack;
-
-	backpack.import_model_from_file("Models\\Tree1.obj");
-
-
-	std::shared_ptr<class_region> grid_region = backpack.reserve_class_region(grid_amount * grid_amount);
-	
-	backpack.add_instance_buffer(16, 3); //attrib size-mat4-16floats, attrib index, for model
-
-	backpack.add_instance_buffer(9, 7); //attrib size-mat3-12floats, attrib index, for transpose_inverse_viewXmodel
-
-	
-
-	model_matrices_grid.reserve(grid_amount * grid_amount);
-	for (int i = 0; i < grid_amount; i++)
-	{
-		for (int j = 0; j < grid_amount; j++)
-		{
-			glm::mat4 model = glm::mat4(1.0f);
-			model = glm::translate(model, glm::vec3(i * 5.0f, 5.0f, j * 5.0f));
-			model = glm::scale(model, glm::vec3(1.0f, 1.0f, 1.0f));
-			model_matrices_grid.push_back(model);
-		}
-
-	}
-	
-	grid_region->data_ptrs[3] = std::shared_ptr<float>((float*)model_matrices_grid.data(), [](float*) {});
-	grid_region->data_amount[3] = (unsigned int)model_matrices_grid.size() * 16;
-
-
-	backpack.load_instance_buffer((float*)model_matrices_grid.data(), (unsigned int)model_matrices_grid.size(), 3, grid_region);
-	Logger::checkGLError("After loading models");
-
-	std::vector<glm::mat3> transpose_inverse_model_matrices_grid;
-	transpose_inverse_model_matrices_grid.reserve(grid_amount * grid_amount);
-	for (int i = 0; i < grid_amount; i++)
-	{
-		for (int j = 0; j < grid_amount; j++)
-		{
-			glm::mat4 model = model_matrices_grid[i * grid_amount + j];
-			glm::mat3 transpose_inverse_model = glm::transpose(glm::inverse(glm::mat3(model)));
-			transpose_inverse_model_matrices_grid.push_back(transpose_inverse_model);
-		}
-	}
-
-	grid_region->data_ptrs[7] = std::shared_ptr<float>((float*)transpose_inverse_model_matrices_grid.data(), [](float*) {});
-	grid_region->data_amount[7] = (unsigned int)transpose_inverse_model_matrices_grid.size() * 9;
-	
-
-	backpack.load_instance_buffer((float*)transpose_inverse_model_matrices_grid.data(), (unsigned int)transpose_inverse_model_matrices_grid.size(), 7, grid_region);
-	Logger::checkGLError("After loading transpose_inverse");
-
-
 	Light sun = {false, glm::vec3(0.0), glm::vec3(0.0,-1.0,0.0), glm::vec3(1.0,1.0,1.0), glm::vec3(5.0,5.0,5.0), glm::vec3(0.5f,0.5f,0.5f),0,0,0,0,0};
 	
 	shader.use();
@@ -247,7 +203,14 @@ int main()
 
 	Logger::checkGLError("After loading light");
 
+	game_object_basic_model backpack;
+
+	backpack.import_model_from_file("Models\\Tree1.obj");
 	
+	backpack.add_instance_buffer(16, 3); //attrib size-mat4-16floats, attrib index, for model
+
+	backpack.add_instance_buffer(9, 7); //attrib size-mat3-12floats, attrib index, for transpose_inverse_viewXmodel
+
 	Tree::set_model(&backpack, grid_amount * grid_amount, 3);
 
 	for (int i = 0; i < grid_amount; i++)
@@ -259,10 +222,38 @@ int main()
 		}
 	}
 
-	//-------------------------------------------------------------------------------------------------------------
-	input_manager = new Input_Manager(manager,window);
+	game_object_basic_model arrow;
+	arrow.import_model_from_file("Models\\Cylinder.obj");
+	
 
-	Event_management::Event_receiver_shared click_receiver = Event_management::make_receiver([](const Event_management::Event& e)
+	int root_index = arrow.import_model_from_file("Models\\Cone.obj");
+	arrow.add_instance_buffer(16, 3);
+	arrow.add_instance_buffer(9, 7);
+	if(root_index < 0)
+	{
+		LOG_ERROR("Failed to load cone model!");
+	}
+	else
+	{
+		LOG_INFO("Cone model loaded successfully with root index: %d", root_index);
+
+		glm::mat4 offset = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, -1.5f, 0.0f));
+		offset = glm::rotate(offset, glm::radians(180.0f), glm::vec3(1.0f, 0.0f, 0.0f));
+		offset = glm::scale(offset, glm::vec3(1.5f, 0.5f, 1.5f));
+
+		arrow.offset_mesh_vertices(arrow.roots[root_index].flattened_index_start, arrow.roots[root_index].flattened_index_end, offset);
+	}
+	
+	
+
+	Arrow::set_model(&arrow, 1);
+	Arrow pointer_arrow(global_registry, "Pointer_arrow");
+	pointer_arrow.set_position({ 0.0f, 4.5f, 0.0f });
+
+	//-------------------------------------------------------------------------------------------------------------
+	my_input_manager = new Input_Manager(manager,window);
+
+	Event_management::Event_receiver_shared click_receiver = Event_management::make_receiver([&pointer_arrow](const Event_management::Event& e)
 		{
 			if (e.type == Event_management::Event_type::Mouse_button_pressed)
 			{
@@ -274,12 +265,14 @@ int main()
 				entt::entity closest_entity = entt::null;
 				float closest_distance = -1.0f;
 
-				auto view = global_registry.view<TransformComponent>();
-				view.each([&](entt::entity entity, TransformComponent& transform)
+				auto view = global_registry.view<Transform_component, Tag_component>();
+				view.each([&](entt::entity entity, Transform_component& transform, Tag_component& tag)
 					{
+						if(tag.tag.find("Tree") == std::string::npos)
+							return; //only check entities with "Tree" in their tag
 
 						glm::vec3 rayDir = Ray_casting::ScreenToWorldRay((float)mouse.mouse_x, (float)mouse.mouse_y,
-							800, 600, fps_camera->projection, fps_camera->view);
+							screen_width, screen_height, fps_camera->projection, fps_camera->view);
 
 						float dist = Ray_casting::ray_sphere_intersection(fps_camera->camera_position, rayDir,
 							glm::vec3(transform.position), 3.0f);
@@ -296,16 +289,18 @@ int main()
 
 				if (closest_entity != entt::null)
 				{
-					auto& tag = global_registry.get<TagComponent>(closest_entity);
-					auto& transform = global_registry.get<TransformComponent>(closest_entity);
+					auto& tag = global_registry.get<Tag_component>(closest_entity);
+					auto& transform = global_registry.get<Transform_component>(closest_entity);
 
 					LOG_INFO("Selected: %s pos: %.2f, %.2f, %.2f", tag.tag.c_str(),
 						transform.position.x, transform.position.y, transform.position.z);
+
+					pointer_arrow.set_position(glm::vec3(transform.position.x, pointer_arrow.get_position().y, transform.position.z));
 				}
 			}
 		});
 
-	input_manager->subscribe(Mouse_input, Event_management::Event_type::Mouse_button_pressed, click_receiver);
+	my_input_manager->subscribe(Mouse_input, Event_management::Event_type::Mouse_button_pressed, click_receiver);
 
 	Event_management::Event_receiver_shared camera_trigger = Event_management::make_receiver([](const Event_management::Event& e)
 	{
@@ -318,13 +313,13 @@ int main()
 					fps_camera->process_mouse_movement(
 						(float)mouse.mouse_x_offset,
 						(float)mouse.mouse_y_offset,
-						(float)input_manager->mouse_sensitivity
+						(float)my_input_manager->mouse_sensitivity
 					);
 				}
 			}
 	});
 
-	input_manager->subscribe(Mouse_input, Event_management::Event_type::Mouse_moved, camera_trigger);
+	my_input_manager->subscribe(Mouse_input, Event_management::Event_type::Mouse_moved, camera_trigger);
 
 	glEnable(GL_DEPTH_TEST); // Enable depth testing for 3D rendering
 	glEnable(GL_CULL_FACE); // Enable face culling to improve performance
@@ -334,6 +329,7 @@ int main()
 	double time_of_last_frame = 1.0, z = 0;
 	std::string fps_text = "";
 	glfwSetTime(0.0);
+	bool reverse_arrow_animation = false;
 
 	shader.bind_UBO("projectionXview_block",fps_camera->Ubo_slot);
 
@@ -352,10 +348,9 @@ int main()
 
 		shader.use();
 		shader.setVec3("viewPos", fps_camera->camera_position);
-		
-		//backpack.draw(shader, grid_region, grid_amount * grid_amount);
 
 		Tree::draw(shader);
+		Arrow::draw(shader);
 
 		Logger::checkGLError("After drawing grid backpack");
 
@@ -368,12 +363,17 @@ int main()
 			fps_text = "FPS: " + std::to_string(y);
 			//LOG_INFO("FPS: %d Draw calls per second: %d", y, draw_call_count);
 			draw_call_count = 0;
+			reverse_arrow_animation = !reverse_arrow_animation;
 		}
 		printer->render_text(fps_text, -1.0f, 0.9f, 2.0f);
 		Logger::checkGLError("After drawing fps");
 
+		pointer_arrow.rotate(glm::vec3(0.0f, 0.005f, 0.0f));
+
+		pointer_arrow.move(glm::vec3(0.0f, reverse_arrow_animation ? 0.001f : -0.001f, 0.0f));
+
 		glfwSwapBuffers(window);
-		input_manager->Poll_keys();
+		my_input_manager->Poll_keys();
 		glfwPollEvents();
 	}
 	delete printer;

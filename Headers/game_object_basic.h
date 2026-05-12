@@ -4,10 +4,9 @@
 
 #include "game_object_basic_model.h"
 
-#include "Components/HierarchyComponents.h"
-#include "Components/TagComponent.h"
-#include "Components/TransformComponent.h"
-
+#include "Components/Hierarchy_components.h"
+#include "Components/Tag_components.h"
+#include "Components/Transform_components.h"
 
 
 //this class is for calling transform upload with each derived classes own static class region
@@ -21,19 +20,25 @@ public:
 	virtual bool get_is_any_child_pos_changed_flag() = 0;
 	virtual void tick_transforms(const glm::mat4) = 0;
 	virtual void trigger_child_pos_changed_flag() = 0;
+	virtual unsigned int get_id() = 0;
 
-void static Tick(entt::registry& registry)
-{
-	auto group = registry.group<TransformComponent, Self_component>(entt::get<>, entt::exclude<ParentComponent>);
-
-	group.each([](auto /*entity*/, TransformComponent& /*transform*/, Self_component& self)
+	void static Tick(entt::registry& registry)
 	{
-		static_cast<game_object_base*>(self.this_object)->tick_transforms(glm::mat4(1.0f));
-	});
+		auto group = registry.group<Transform_component>(entt::get<Id_component>, entt::exclude<Parent_component>);
 
-	upload_all_transforms();
+		group.each([](auto /*entity*/, Transform_component& /*transform*/, Id_component& id_comp)
+		{
+			Global_object_map::get_object(id_comp.id)->tick_transforms(glm::mat4(1.0f));
+		});
 
-}
+		upload_all_transforms();
+
+	}
+
+	static unsigned int get_id_counter()
+	{
+		return id_counter;
+	}
 
 protected:
 	static std::vector<std::function<void()>>& get_func_registry()
@@ -52,6 +57,17 @@ protected:
 		for (auto& fn : get_func_registry())
 			fn();
 	}
+
+	static unsigned int generate_id()
+	{
+		return id_counter++;
+	}
+	
+	game_object_base() = default;
+
+private:
+
+	static inline unsigned int id_counter = 1;
 };
 
 template <typename Derived>
@@ -139,7 +155,7 @@ private:
 			}
 
 			// Pull world matrix from EnTT
-			TransformComponent& tc = obj->registry.get<TransformComponent>(obj->this_object);
+			Transform_component& tc = obj->registry.get<Transform_component>(obj->this_object);
 
 			if (batch_start == -1)
 				batch_start = i; // start a new batch here
@@ -160,11 +176,13 @@ private:
 	entt::entity this_object;
 	entt::registry& registry;
 
+	unsigned int id = 0;
+
 	int region_slot_index = -1; // this objects slot in region->object_ptrs
 
-	TransformComponent& get_transform_ref()
+	Transform_component& get_transform_ref() const
 	{
-		return registry.get<TransformComponent>(this_object);
+		return registry.get<Transform_component>(this_object);
 	}
 
 	static game_object_basic* from_region_ptr(void* ptr)
@@ -181,14 +199,14 @@ protected:
 	void trigger_child_pos_changed_flag() override
 	{
 		is_any_child_pos_changed_flag = true;
-		ParentComponent* comp = registry.try_get<ParentComponent>(this_object);
+		Parent_component* comp = registry.try_get<Parent_component>(this_object);
 
 		if(comp != nullptr)
 		{
-			if(static_cast<game_object_base*>(comp->parent)->get_is_any_child_pos_changed_flag())
+			if(Global_object_map::get_object(comp->parent_id)->get_is_any_child_pos_changed_flag())
 				return;
 			else
-				static_cast<game_object_base*>(comp->parent)->trigger_child_pos_changed_flag();
+				Global_object_map::get_object(comp->parent_id)->trigger_child_pos_changed_flag();
 		}
 	}
 
@@ -221,7 +239,7 @@ protected:
 
 	void tick_transforms(const glm::mat4 parent_transform) override
 	{
-		TransformComponent& this_transform = get_transform_ref();
+		Transform_component& this_transform = get_transform_ref();
 
 		if(is_pos_changed_flag)
 		{
@@ -239,13 +257,13 @@ protected:
 
 		}
 
-		ChildComponent* childs = registry.try_get<ChildComponent>(this_object);
+		Child_component* childs = registry.try_get<Child_component>(this_object);
 
 		if (childs != nullptr)
 		{
-			for (void* child_ptr : childs->children)
+			for (unsigned int child_id : childs->children_ids)
 			{
-				game_object_base* child = static_cast<game_object_base*>(child_ptr);
+				game_object_base* child = Global_object_map::get_object(child_id);
 
 				if (is_pos_changed_flag)
 					child->set_is_pos_changed_flag(true);
@@ -262,21 +280,25 @@ protected:
 	}
 	
 	game_object_basic(entt::registry& registry, const std::string& tag = "Undefined tag",
-		game_object_basic* parent_object = nullptr, TransformComponent transform = TransformComponent())
+		game_object_basic* parent_object = nullptr, Transform_component transform = Transform_component())
 		: registry(registry)
 	{
 		this_object = registry.create();
-		
-		registry.emplace<Self_component>(this_object, static_cast<void*>(this));
-		
-		registry.emplace<TagComponent>(this_object, tag);
 
-		registry.emplace<TransformComponent>(this_object, transform);
+		id = generate_id();
+		
+		Global_object_map::register_object(this);
+
+		registry.emplace<Id_component>(this_object, id);
+		
+		registry.emplace<Tag_component>(this_object, tag);
+
+		registry.emplace<Transform_component>(this_object, transform);
 		
 		if(parent_object != nullptr)
 		{
-			registry.emplace<ParentComponent>(this_object, static_cast<void*>(parent_object));
-			registry.get_or_emplace<ChildComponent>(parent_object->this_object).children.push_back(static_cast<void*>(this));
+			registry.emplace<Parent_component>(this_object, parent_object->get_id());
+			registry.get_or_emplace<Child_component>(parent_object->this_object).children_ids.push_back(id);
 		}
 
 		if(region != nullptr)
@@ -311,11 +333,18 @@ protected:
 	{
 		if (region && region_slot_index >= 0)
 			region->object_ptrs[region_slot_index] = nullptr;
+
+		Global_object_map::unregister_object(id);
 	}
 
 public:
 
-	TransformComponent get_transform_copy()
+	unsigned int get_id() override
+	{
+		return id;
+	}
+
+	Transform_component get_transform_copy() const
 	{
 		return get_transform_ref();
 	}
@@ -358,14 +387,24 @@ public:
 		trigger_pos_changed_flags();
 	}
 
+	//---get transforms------------------------------------------------------------------------
+	glm::vec3 get_position() const
+	{
+		return get_transform_ref().position;
+	}
+
+	glm::vec3 get_rotation() const
+	{
+		return get_transform_ref().rotation;
+	}
+
+	glm::vec3 get_scale() const
+	{
+		return get_transform_ref().scale;
+	}
+
 	//--- upload/change model--------------------------------------------------------------------
 
-	/// <summary>
-	/// 
-	/// </summary>
-	/// <param name="new_model"></param>
-	/// <param name="region_size"></param>
-	/// <param name="transform_attrib_index_in"></param>
 	/// <param name="tranpose_inverse_transform_attrib_index_in">if -1 or smaller, dont upload transpose inverse transform</param>
 	static void set_model(game_object_basic_model* new_model, const unsigned int region_size,
 		int transform_attrib_index_in = 3, int tranpose_inverse_transform_attrib_index_in = 7)
@@ -429,3 +468,46 @@ public:
 		return 0;
 	}
 };
+
+namespace Global_object_map
+{
+	inline std::unordered_map<unsigned int, game_object_base*> object_list;
+
+	inline void register_object(game_object_base* obj)
+	{
+		unsigned int id = obj->get_id();
+
+		if (id == 0)
+		{
+			LOG_ERROR("Global_object_map: Invalid id 0, no object can have this id!");
+			return;
+		}
+		else
+		{
+			//LOG_DEBUG("Global_object_map: Registering object with id %u", id);
+		}
+
+		object_list[id] = obj;
+	}
+
+	inline void unregister_object(unsigned int id)
+	{
+		object_list.erase(id);
+	}
+
+	inline game_object_base* get_object(unsigned int id)
+	{
+		if(id == 0)
+		{
+			LOG_ERROR("Global_object_map: Invalid id 0, no object can have this id!");
+			return nullptr;
+		}
+
+		auto it = object_list.find(id);
+		if(it == object_list.end())
+		{
+			LOG_ERROR("Global_object_map: No object with id %u found!", id);
+		}
+		return it != object_list.end() ? it->second : nullptr;
+	}
+}

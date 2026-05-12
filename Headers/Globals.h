@@ -170,7 +170,6 @@ struct class_region //VBO regions given to classes and data inside them
 	std::vector<std::shared_ptr<float>> data_ptrs;//datas for this region, vector index -> attribute index, and pointer for data
 	std::vector<unsigned int> data_amount;//amount of floats in data_ptr
 
-	//TODO: change the void* to object* when object class finished
 	//pointers to individual objects in this region, null* means currently no object using that slot, and can be used for new objects.
 	//used for object deletion/addition without changing offsets of other objects in the region, 
 	//and for tracking which object is where in the region, so we can batch upload when sequential objects changed (buffersubdata)
@@ -1073,7 +1072,6 @@ namespace Event_management
 	using Event_receiver_weak = std::weak_ptr<std::function<void(const Event&)>>;
 
 	template<typename T>
-
 	Event_receiver_shared make_receiver(T&& lambda)
 	{
 		return std::make_shared<std::function<void(const Event&)>>(std::forward<T>(lambda));
@@ -1124,11 +1122,5 @@ namespace Event_management
 		virtual ~Event() {}
 
 	};
-
-
-
-
-
 }
-
 //end of namespaces-------------------------------------------------------------------------------
