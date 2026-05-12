@@ -24,7 +24,7 @@ Event_manager manager;
 Input_Manager* my_input_manager;
 
 //-*-*-*-*-*-*-*-**-*-*-*-*-**-*-*-*-*-*-*-*-*-*-*-*-*-*-*-**-*-*-*-*-*-*-*-*
-int grid_amount = 10;
+int grid_amount = 100;
 //-*-*-*-*-*-*-*-**-*-*-*-*-**-*-*-*-*-*-*-*-*-*-*-*-*-*-*-**-*-*-*-*-*-*-*-*
 
 class Tree : public game_object_basic<Tree> {
@@ -267,25 +267,25 @@ int main()
 
 				auto view = global_registry.view<Transform_component, Tag_component>();
 				view.each([&](entt::entity entity, Transform_component& transform, Tag_component& tag)
+				{
+					if(tag.tag.find("Tree") == std::string::npos)
+						return; //only check entities with "Tree" in their tag
+
+					glm::vec3 rayDir = Ray_casting::ScreenToWorldRay((float)mouse.mouse_x, (float)mouse.mouse_y,
+						screen_width, screen_height, fps_camera->projection, fps_camera->view);
+
+					float dist = Ray_casting::ray_sphere_intersection(fps_camera->camera_position, rayDir,
+						glm::vec3(transform.position), 3.0f);
+
+					if (dist > 0)
 					{
-						if(tag.tag.find("Tree") == std::string::npos)
-							return; //only check entities with "Tree" in their tag
-
-						glm::vec3 rayDir = Ray_casting::ScreenToWorldRay((float)mouse.mouse_x, (float)mouse.mouse_y,
-							screen_width, screen_height, fps_camera->projection, fps_camera->view);
-
-						float dist = Ray_casting::ray_sphere_intersection(fps_camera->camera_position, rayDir,
-							glm::vec3(transform.position), 3.0f);
-
-						if (dist > 0)
+						if (closest_distance < 0 || dist < closest_distance)
 						{
-							if (closest_distance < 0 || dist < closest_distance)
-							{
-								closest_distance = dist;
-								closest_entity = entity;
-							}
+							closest_distance = dist;
+							closest_entity = entity;
 						}
-					});
+					}
+				});
 
 				if (closest_entity != entt::null)
 				{
@@ -337,6 +337,77 @@ int main()
 	while (!glfwWindowShouldClose(window))
 	{
 
+		// Frustum culling test start --------------------------------------------------------------
+		float fov = 10.0f;
+		float fov_cosine = cos(glm::radians(fov / 2.0f));
+
+		std::unordered_set<unsigned int> visible_list;
+		std::unordered_set<int> available_indices;
+
+		auto group = global_registry.group<Transform_component>(entt::get<Id_component, Tag_component >);
+
+		group.each([&fov_cosine, &visible_list](auto /*entity*/, Transform_component& transform,
+			Id_component& id_comp, Tag_component& tag_comp)
+		{
+			if (tag_comp.tag.find("Tree") == std::string::npos)
+			{
+				return; //only check entities with "Tree" in their tag
+			}
+					
+			if (Ray_casting::is_in_frustum(fps_camera->camera_position,
+				fps_camera->camera_front, transform.position, 100.0f, fov_cosine))
+			{
+				visible_list.insert(id_comp.id);
+			}
+		});
+
+		const unsigned int visible_amount = (unsigned int)visible_list.size();
+
+		std::vector<void*> region = Tree::get_class_region()->object_ptrs;
+
+		for(unsigned int i =0; i < visible_amount; i++)
+		{
+			game_object_base* ptr = static_cast<game_object_base*>(region[i]);
+
+			if(ptr == nullptr)
+			{
+				available_indices.insert(i);
+				continue;
+			}
+
+			unsigned int temp_id = ptr->get_id();
+
+			if(visible_list.find(temp_id) != visible_list.end())
+			{
+				visible_list.erase(temp_id);
+				continue;
+			}
+			else
+			{
+				available_indices.insert(i);
+				continue;
+			}
+		}
+
+		for(unsigned int id : visible_list)
+		{
+			auto it = available_indices.begin();
+			int new_index = *it;
+			available_indices.erase(it);
+
+			void* obj_ptr = region[new_index];
+			if(obj_ptr == nullptr)
+			{
+				Global_object_map::get_object(id)->use_null_region_pos(new_index);
+			}
+			else
+			{
+				static_cast<game_object_base*>(obj_ptr)->swap_region_pos(id);
+			}
+		}
+
+		// Frustum culling test end -----------------------------------------------------------------
+
 		game_object_base::Tick(global_registry);
 		camera_control = glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_RIGHT) == GLFW_PRESS;
 
@@ -349,7 +420,7 @@ int main()
 		shader.use();
 		shader.setVec3("viewPos", fps_camera->camera_position);
 
-		Tree::draw(shader);
+		Tree::draw(shader, visible_amount);
 		Arrow::draw(shader);
 
 		Logger::checkGLError("After drawing grid backpack");

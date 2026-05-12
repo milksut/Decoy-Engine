@@ -1,7 +1,6 @@
 #pragma once
 
 #include <glm/glm.hpp>
-#include "Camera_test.h"
 
 namespace Ray_casting
 {
@@ -63,6 +62,26 @@ namespace Ray_casting
         if (t2 > 0.0f) return t2;
 
         return -1.0f;
+    }
+
+    bool is_in_frustum(const glm::vec3& camera_pos,  const glm::vec3& camera_front, const glm::vec3& object_pos,
+        float max_distance, float fov_cosine)
+    {
+        // Vector from camera to object
+        glm::vec3 to_obj = object_pos - camera_pos;
+
+        // Distance check
+        float dist = glm::length(to_obj);
+        if (dist > max_distance) return false;
+
+        // Normalize direction
+        glm::vec3 dir = glm::normalize(to_obj);
+
+        // Dot product with camera front
+        float dot = glm::dot(dir, glm::normalize(camera_front));
+
+        // If dot is greater than cos(fov/2), object is inside view cone
+        return dot > fov_cosine;
     }
 
 }

@@ -421,20 +421,20 @@ private:
 			if (!can_override_vbo && instance_attributes[attrib_index].VBO != 0)
 				return -1; //attribute already filled
 
-			/*if (can_override_vbo && instance_attributes[attrib_index].VBO != 0)
+			int index_amount = (attrib_size / 4) + (attrib_size%4 ==0? 0:1);
+
+			if (attrib_index + index_amount -1  >= VAO_MAX_ATTRIB_AMOUNT || attrib_index <= 2)
+				return -1; // Invalid or mesh's attribute index
+			
+			if (can_override_vbo && instance_attributes[attrib_index].VBO != 0)
 			{
 				glDeleteBuffers(1, &instance_attributes[attrib_index].VBO);
 				// clear all slots that shared this VBO
 				for (auto& attrib : instance_attributes)
 					if (attrib.VBO == instance_attributes[attrib_index].VBO)
 						attrib = empty_attrib;
-			}*/
+			}
 
-			int index_amount = (attrib_size / 4) + (attrib_size%4 ==0? 0:1);
-
-			if (attrib_index + index_amount -1  >= VAO_MAX_ATTRIB_AMOUNT || attrib_index <= 2)
-				return -1; // Invalid or mesh's attribute index
-			
 			int wanted_amount = shared_regions.empty() ? 0 : shared_regions.back()->offset_in_numbers + shared_regions.back()->size_in_number;
 
 			unsigned int attrib_size_bytes = (attrib_size * (unsigned int)sizeof(float));

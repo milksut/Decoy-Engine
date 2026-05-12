@@ -29,9 +29,20 @@ public:
 	virtual bool get_is_pos_changed_flag() = 0;
 	virtual void set_is_any_child_pos_changed_flag(bool val) = 0;
 	virtual bool get_is_any_child_pos_changed_flag() = 0;
-	virtual void tick_transforms(const glm::mat4) = 0;
+	virtual void set_should_upload_flag(bool val) = 0;
+	virtual bool get_should_upload_flag() = 0;
+
 	virtual void trigger_child_pos_changed_flag() = 0;
+	virtual void trigger_pos_changed_flags() = 0;
+
+	virtual void tick_transforms(const glm::mat4) = 0;
+	
 	virtual unsigned int get_id() = 0;
+
+	virtual void use_null_region_pos(const int null_region_index) = 0;
+	virtual void swap_region_pos(const unsigned int other_object_id) = 0;
+	
+	virtual int swap_region_index(int new_index) = 0;
 
 	void static Tick(entt::registry& registry_in)
 	{
@@ -76,6 +87,8 @@ protected:
 	
 	game_object_base() = default;
 
+	
+
 private:
 
 	static inline unsigned int id_counter = 1;
@@ -99,6 +112,7 @@ private:
 	static inline std::shared_ptr<class_region> region = nullptr;
 	static inline int transform_attrib_index = -1;   // VAO attrib slot for world mat4 (e.g. 3)
 	static inline int transpose_inverse_transform_attrib_index = -1; // VAO attrib slot for transpose inverse world mat4 (e.g. 7)
+
 	static void tick_upload_transforms()
 	{
 		if (!model || !region || transform_attrib_index < 0)
@@ -159,7 +173,7 @@ private:
 			// game_object_basic instances ever write into object_ptrs
 			game_object_basic* obj = static_cast<game_object_basic*>(ptr);
 
-			if (!obj->is_pos_changed_flag)
+			if (!obj->should_upload_flag)
 			{
 				flush_batch();
 				continue;
@@ -176,7 +190,7 @@ private:
 			if(transpose_inverse_transform_attrib_index >= 0)
 				staging_inverse.push_back(glm::transpose(glm::inverse(glm::mat3(tc.world))));
 
-			obj->is_pos_changed_flag = false; // reset flag after queuing for upload
+			obj->should_upload_flag = false; // reset flag after queuing for upload
 		}
 
 		flush_batch(); // flush any trailing batch
@@ -191,6 +205,24 @@ private:
 
 	int region_slot_index = -1; // this objects slot in region->object_ptrs
 
+	int swap_region_index(const int new_index) override
+	{
+		if(region == nullptr)
+		{
+			LOG_ERROR("Game_object_basic : This object dont have a region! cant swap index");
+			return -1;
+		}
+
+		int temp = region_slot_index;
+		region_slot_index = new_index;
+
+		region->object_ptrs[temp] = nullptr;
+		region->object_ptrs[region_slot_index] = this;
+
+		set_should_upload_flag(true);
+		return temp;
+	}
+
 	Transform_component& get_transform_ref() const
 	{
 		return registry.get<Transform_component>(this_object);
@@ -203,6 +235,7 @@ private:
 
 protected:
 
+	bool should_upload_flag = false;
 	bool is_pos_changed_flag = false;
 	bool is_any_child_pos_changed_flag = false;
 
@@ -221,8 +254,9 @@ protected:
 		}
 	}
 
-	void trigger_pos_changed_flags()
+	void trigger_pos_changed_flags() override
 	{
+		should_upload_flag = true;
 		is_pos_changed_flag = true;
 		trigger_child_pos_changed_flag();
 	}
@@ -247,10 +281,22 @@ protected:
 		return is_any_child_pos_changed_flag;
 	}
 
+	void set_should_upload_flag(bool val) override 
+	{
+		should_upload_flag = val;
+	}
+
+	bool get_should_upload_flag() override
+	{
+		return should_upload_flag;
+	}
+
 
 	void tick_transforms(const glm::mat4 parent_transform) override
 	{
 		Transform_component& this_transform = get_transform_ref();
+
+		bool temp_trigger_child_flag = is_pos_changed_flag;
 
 		if(is_pos_changed_flag)
 		{
@@ -266,9 +312,12 @@ protected:
 			// World Transform
 			this_transform.world = parent_transform * local;
 
+			is_pos_changed_flag = false;
+
 		}
 
 		Child_component* childs = registry.try_get<Child_component>(this_object);
+		
 
 		if (childs != nullptr)
 		{
@@ -276,8 +325,8 @@ protected:
 			{
 				game_object_base* child = Global_object_map::get_object(child_id);
 
-				if (is_pos_changed_flag)
-					child->set_is_pos_changed_flag(true);
+				if (temp_trigger_child_flag)
+					child->trigger_pos_changed_flags();
 
 				else if (!child->get_is_any_child_pos_changed_flag())
 					continue;
@@ -287,7 +336,6 @@ protected:
 		}
 		
 		set_is_any_child_pos_changed_flag(false);
-
 	}
 	
 	game_object_basic(entt::registry& registry_in, const std::string& tag = "Undefined tag",
@@ -358,6 +406,55 @@ public:
 	Transform_component get_transform_copy() const
 	{
 		return get_transform_ref();
+	}
+
+	void use_null_region_pos(const int null_region_index) override
+	{
+		if (region == nullptr)
+		{
+			LOG_ERROR("Game_object_basic: Cannot use null region pos, region is not initialized!");
+			return;
+		}
+		else if (null_region_index < 0 || null_region_index >= static_cast<int>(region->object_ptrs.size()))
+		{
+			LOG_ERROR("Game_object_basic: Null region index %d is out of bounds (valid range: 0 to %d).",
+				null_region_index, static_cast<int>(region->object_ptrs.size()) - 1);
+			return;
+		}
+		else if (region->object_ptrs[null_region_index] != nullptr)
+		{
+			LOG_ERROR("Game_object_basic: Slot %d is not empty, cannot assign object here!", null_region_index);
+			return;
+		}
+
+		swap_region_index(null_region_index);
+	}
+
+	void swap_region_pos(const unsigned int other_object_id) override
+	{
+		if(id == other_object_id)
+		{
+			LOG_DEBUG("Game_object_basic : No need to swap pos with it self at id %d", id);
+			return;
+		}
+
+		game_object_base* ptr = Global_object_map::get_object(id);
+
+		if(ptr == nullptr)
+		{
+			LOG_ERROR("Game_object_basic :There is no Object with id %d to swap with!", id);
+			return;
+		}
+
+		int temp_index_holder = region_slot_index;
+
+		swap_region_index(ptr->swap_region_index(temp_index_holder));
+
+	}
+
+	static std::shared_ptr<class_region> get_class_region()
+	{
+		return region;
 	}
 
 	//---set transforms-----------------------------------------------------------------------
