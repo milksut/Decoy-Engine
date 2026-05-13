@@ -64,6 +64,18 @@ public:
 	glm::mat4 view;
 
 	int Ubo_slot = -1;
+
+	/// <summary>
+	///     Constructs the camera and initializes its uniform buffer object (UBO).
+	/// </summary>
+	/// <remarks>
+	///     Sets initial position, rotation, and world up vector.
+	///     Creates and binds a UBO for storing camera matrices,
+	///     assigns it to a free UBO slot, and initializes projection and view matrices.
+	/// </remarks>
+	/// <param name="position_in">[in] Initial camera position.</param>
+	/// <param name="camera_angles_in">[in] Initial camera rotation angles (Euler).</param>
+	/// <param name="world_up_in">[in] World up direction vector.</param>
 	camera_test(
 		glm::vec3 position_in = glm::vec3(0.0f, 0.0f, 3.0f),
 		glm::vec3 camera_angles_in = glm::vec3(0.0f, 0.0f, 0.0f),

@@ -268,5 +268,22 @@ public:
 		glEnable(GL_DEPTH_TEST);
 		glDisable(GL_BLEND);
 	}
+
+	/// <summary>
+	///     Calculates the on-screen size of a text string.
+	/// </summary>
+	/// <param name="text">[in] Text to measure.</param>
+	/// <param name="scale">[in] Scale factor applied to character size.</param>
+	/// <returns>Width and height of rendered text in screen space.</returns>
+	glm::vec2 get_text_size(const std::string& text, float scale)
+	{
+		float char_w = screen_char_width * scale;
+		float char_h = screen_char_height * scale;
+
+		return {
+			text.size() * char_w,
+			char_h
+		};
+	}
 };
 

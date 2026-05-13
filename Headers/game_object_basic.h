@@ -44,6 +44,14 @@ public:
 	
 	virtual int swap_region_index(int new_index) = 0;
 
+	/// <summary>
+	///     Updates all root transforms and uploads final transformation data.
+	/// </summary>
+	/// <remarks>
+	///     Iterates over entities without Parent_component, applies tick_transforms
+	///     starting from identity matrix, then uploads all results to GPU or storage.
+	/// </remarks>
+	/// <param name="registry_in">[in] ECS registry containing scene entities.</param>
 	void static Tick(entt::registry& registry_in)
 	{
 		auto group = registry_in.group<Transform_component>(entt::get<Id_component>, entt::exclude<Parent_component>);
@@ -57,29 +65,59 @@ public:
 
 	}
 
+	/// <summary>
+	///     Returns the current global ID counter value.
+	/// </summary>
+	/// <returns>Current value of the internal id counter.</returns>
 	static unsigned int get_id_counter()
 	{
 		return id_counter;
 	}
 
 protected:
+	/// <summary>
+	///     Returns a static registry of callable functions.
+	/// </summary>
+	/// <remarks>
+	///     The registry is stored as a static vector and persists for the lifetime of the program.
+	///     Used to store deferred or global callbacks.
+	/// </remarks>
+	/// <returns>Reference to the function registry vector.</returns>
 	static std::vector<std::function<void()>>& get_func_registry()
 	{
 		static std::vector<std::function<void()>> func_registry;
 		return func_registry;
 	}
 
+	/// <summary>
+	///     Registers a callback function to be executed during transform upload phase.
+	/// </summary>
+	/// <param name="fn">[in] Function to register and store in the global registry.</param>
 	static void register_upload_transform(std::function<void()> fn)
 	{
 		get_func_registry().push_back(std::move(fn));
 	}
 
+	/// <summary>
+	///     Executes all registered transform upload callbacks.
+	/// </summary>
+	/// <remarks>
+	///     Iterates through the global function registry and calls each stored function.
+	///     Typically used to push transform data to GPU or render pipeline.
+	/// </remarks>
 	static void upload_all_transforms()
 	{
 		for (auto& fn : get_func_registry())
 			fn();
 	}
 
+	/// <summary>
+	///     Generates a unique incremental ID.
+	/// </summary>
+	/// <remarks>
+	///     Increments the internal counter after returning its current value.
+	/// </remarks>
+	/// <returns>New unique ID.</returns>
 	static unsigned int generate_id()
 	{
 		return id_counter++;
@@ -113,6 +151,22 @@ private:
 	static inline int transform_attrib_index = -1;   // VAO attrib slot for world mat4 (e.g. 3)
 	static inline int transpose_inverse_transform_attrib_index = -1; // VAO attrib slot for transpose inverse world mat4 (e.g. 7)
 
+
+	/// <summary>
+	///     Uploads pending transform data to GPU in batched ranges.
+	/// </summary>
+	/// <remarks>
+	///     Iterates over region objects and groups consecutive valid transforms into batches
+	///     to minimize GPU buffer updates. Uploads both world matrices (mat4) and optional
+	///     inverse-transpose matrices (mat3).
+	/// </remarks>
+	/// <param name="model">Model containing instance buffers.</param>
+	/// <param name="region">Instance region holding object pointers.</param>
+	/// <param name="transform_attrib_index">Attribute index for world matrices.</param>
+	/// <param name="transpose_inverse_transform_attrib_index">
+	/// Optional attribute index for inverse-transpose matrices (-1 if disabled).
+	/// </param>
+	/// <returns>void</returns>
 	static void tick_upload_transforms()
 	{
 		if (!model || !region || transform_attrib_index < 0)
@@ -205,6 +259,15 @@ private:
 
 	int region_slot_index = -1; // this objects slot in region->object_ptrs
 
+	/// <summary>
+	///     Swaps the object's index inside its instance region.
+	/// </summary>
+	/// <remarks>
+	///     Updates the region slot mapping, clears the old slot, assigns the new slot,
+	///     and marks the object for transform upload.
+	/// </remarks>
+	/// <param name="new_index">[in] New index inside the region.</param>
+	/// <returns>Previous region slot index, or -1 if region is null.</returns>
 	int swap_region_index(const int new_index) override
 	{
 		if(region == nullptr)
@@ -223,11 +286,27 @@ private:
 		return temp;
 	}
 
+	/// <summary>
+	///     Returns a reference to the entity's Transform_component.
+	/// </summary>
+	/// <remarks>
+	///     Directly queries the ECS registry using the stored entity handle.
+	/// </remarks>
+	/// <returns>Reference to Transform_component.</returns>
 	Transform_component& get_transform_ref() const
 	{
 		return registry.get<Transform_component>(this_object);
 	}
 
+	/// <summary>
+	///     Converts a raw region pointer back into a game object pointer.
+	/// </summary>
+	/// <remarks>
+	///     Assumes the pointer originally points to a game_object_basic instance.
+	///     Unsafe if used with invalid or mismatched types.
+	/// </remarks>
+	/// <param name="ptr">[in] Raw pointer stored in region.</param>
+	/// <returns>Pointer to game_object_basic instance.</returns>
 	static game_object_basic* from_region_ptr(void* ptr)
 	{
 		return static_cast<game_object_basic<Derived>*>(ptr);
@@ -240,6 +319,13 @@ protected:
 	bool is_any_child_pos_changed_flag = false;
 
 	//TODO: renamke this to prevent miss use
+	/// <summary>
+	///     Propagates a "child position changed" flag up the parent hierarchy.
+	/// </summary>
+	/// <remarks>
+	///     Marks the current object as having a changed child transform, then recursively
+	///     notifies the parent (if it exists) unless it is already marked.
+	/// </remarks>
 	void trigger_child_pos_changed_flag() override
 	{
 		is_any_child_pos_changed_flag = true;
@@ -254,6 +340,12 @@ protected:
 		}
 	}
 
+	/// <summary>
+	///     Marks the object as having a position/transform change.
+	/// </summary>
+	/// <remarks>
+	///     Sets internal dirty flags and propagates the change to parent objects.
+	/// </remarks>
 	void trigger_pos_changed_flags() override
 	{
 		should_upload_flag = true;
@@ -261,37 +353,68 @@ protected:
 		trigger_child_pos_changed_flag();
 	}
 
+	/// <summary>
+	///     Sets the internal position-changed flag.
+	/// </summary>
+	/// <param name="val">[in] New flag value.</param>
 	void set_is_pos_changed_flag(bool val) override
 	{
 		is_pos_changed_flag = val;
 	}
 
+	/// <summary>
+	///     Returns whether the object's position/transform has changed.
+	/// </summary>
+	/// <returns>True if position changed flag is set.</returns>
 	bool get_is_pos_changed_flag() override
 	{
 		return is_pos_changed_flag;
 	}
 
+	/// <summary>
+	///     Sets the flag indicating that any child transform has changed.
+	/// </summary>
+	/// <param name="val">[in] New flag value.</param>
 	void set_is_any_child_pos_changed_flag(bool val) override
 	{
 		is_any_child_pos_changed_flag = val;
 	}
 
+	/// <summary>
+	///     Returns whether any child object's position/transform has changed.
+	/// </summary>
+	/// <returns>True if a child transform change flag is set.</returns>
 	bool get_is_any_child_pos_changed_flag() override
 	{
 		return is_any_child_pos_changed_flag;
 	}
 
+	/// <summary>
+	///     Sets the flag that indicates whether this object should upload its transform data.
+	/// </summary>
+	/// <param name="val">[in] New flag value.</param>
 	void set_should_upload_flag(bool val) override 
 	{
 		should_upload_flag = val;
 	}
 
+	/// <summary>
+	///     Returns whether this object is marked for transform upload.
+	/// </summary>
+	/// <returns>True if the object should upload its data.</returns>
 	bool get_should_upload_flag() override
 	{
 		return should_upload_flag;
 	}
 
-
+	/// <summary>
+	///     Updates world transforms recursively through the scene hierarchy.
+	/// </summary>
+	/// <remarks>
+	///     Computes local-to-world matrices when needed and propagates transform changes
+	///     to child objects using dirty-flag optimization.
+	/// </remarks>
+	/// <param name="parent_transform">[in] Parent world transform matrix.</param>
 	void tick_transforms(const glm::mat4 parent_transform) override
 	{
 		Transform_component& this_transform = get_transform_ref();
@@ -338,6 +461,18 @@ protected:
 		set_is_any_child_pos_changed_flag(false);
 	}
 	
+	/// <summary>
+	///     Constructs a game object and registers it in the ECS and global object map.
+	/// </summary>
+	/// <remarks>
+	///     Creates an entity, assigns ID, tag, transform, optional parent-child hierarchy,
+	///     and places the object into a class region slot if available.
+	///     Finally marks the object as needing a transform update.
+	/// </remarks>
+	/// <param name="registry_in">[in] ECS registry reference.</param>
+	/// <param name="tag">[in] Debug/tag name of the object.</param>
+	/// <param name="parent_object">[in] Optional parent object for hierarchy.</param>
+	/// <param name="transform">[in] Initial transform component.</param>
 	game_object_basic(entt::registry& registry_in, const std::string& tag = "Undefined tag",
 		game_object_basic* parent_object = nullptr, Transform_component transform = Transform_component())
 		: registry(registry_in)
@@ -398,16 +533,31 @@ protected:
 
 public:
 
+	/// <summary>
+	///     Returns the unique ID of the game object.
+	/// </summary>
+	/// <returns>Object ID.</returns>
 	unsigned int get_id() override
 	{
 		return id;
 	}
 
+	/// <summary>
+	///     Returns a copy of the object's Transform_component.
+	/// </summary>
+	/// <returns>Copy of the current transform.</returns>
 	Transform_component get_transform_copy() const
 	{
 		return get_transform_ref();
 	}
 
+	/// <summary>
+	///     Moves the object into a specified empty slot within its region.
+	/// </summary>
+	/// <remarks>
+	///     Validates region existence, bounds, and slot availability before swapping indices.
+	/// </remarks>
+	/// <param name="null_region_index">[in] Target empty slot index in the region.</param>
 	void use_null_region_pos(const int null_region_index) override
 	{
 		if (region == nullptr)
@@ -430,6 +580,13 @@ public:
 		swap_region_index(null_region_index);
 	}
 
+	/// <summary>
+	///     Swaps this object's region slot position with another object.
+	/// </summary>
+	/// <remarks>
+	///     Exchanges indices between two objects within the same region.
+	/// </remarks>
+	/// <param name="other_object_id">[in] ID of the object to swap region positions with.</param>
 	void swap_region_pos(const unsigned int other_object_id) override
 	{
 		if(id == other_object_id)
@@ -452,24 +609,41 @@ public:
 
 	}
 
+	/// <summary>
+	///     Returns the class region associated with the object.
+	/// </summary>
+	/// <returns>Shared pointer to the current class_region.</returns>
 	static std::shared_ptr<class_region> get_class_region()
 	{
 		return region;
 	}
 
 	//---set transforms-----------------------------------------------------------------------
+
+	/// <summary>
+	///     Sets the object's world position and marks it for transform update.
+	/// </summary>
+	/// <param name="new_pos">[in] New position in world space.</param>
 	void set_position(const glm::vec3& new_pos)
 	{
 		get_transform_ref().position = new_pos;
 		trigger_pos_changed_flags();
 	}
 
+	/// <summary>
+	///     Sets the object's rotation and marks it for transform update.
+	/// </summary>
+	/// <param name="new_rot">[in] New rotation (Euler angles in degrees).</param>
 	void set_rotation(const glm::vec3& new_rot)
 	{
 		get_transform_ref().rotation = new_rot;
 		trigger_pos_changed_flags();
 	}
 
+	/// <summary>
+	///     Sets the object's scale and marks it for transform update.
+	/// </summary>
+	/// <param name="new_scale">[in] New scale vector.</param>
 	void set_scale(const glm::vec3& new_scale)
 	{
 		get_transform_ref().scale = new_scale;
@@ -477,18 +651,31 @@ public:
 	}
 
 	//---update transforms------------------------------------------------------------------------
+
+	/// <summary>
+	///     Moves the object by a delta offset and marks it for transform update.
+	/// </summary>
+	/// <param name="delta_pos">[in] Position offset to add to current position.</param>
 	void move(const glm::vec3& delta_pos)
 	{
 		get_transform_ref().position += delta_pos;
 		trigger_pos_changed_flags();
 	}
 
+	/// <summary>
+	///     Rotates the object by a delta Euler angle and marks it for transform update.
+	/// </summary>
+	/// <param name="delta_rot">[in] Rotation offset (Euler angles in degrees).</param>
 	void rotate(const glm::vec3& delta_rot)
 	{
 		get_transform_ref().rotation += delta_rot;
 		trigger_pos_changed_flags();
 	}
 
+	/// <summary>
+	///     Scales the object by multiplying its current scale and marks it for transform update.
+	/// </summary>
+	/// <param name="delta_scale">[in] Scale multiplier applied to current scale.</param>
 	void scale(const glm::vec3& delta_scale)
 	{
 		get_transform_ref().scale *= delta_scale;
@@ -496,16 +683,29 @@ public:
 	}
 
 	//---get transforms------------------------------------------------------------------------
+
+	/// <summary>
+	///     Returns the object's current position.
+	/// </summary>
+	/// <returns>World position vector.</returns>
 	glm::vec3 get_position() const
 	{
 		return get_transform_ref().position;
 	}
 
+	/// <summary>
+	///     Returns the object's current rotation.
+	/// </summary>
+	/// <returns>Euler rotation (in degrees).</returns>
 	glm::vec3 get_rotation() const
 	{
 		return get_transform_ref().rotation;
 	}
 
+	/// <summary>
+	///     Returns the object's current scale.
+	/// </summary>
+	/// <returns>Scale vector.</returns>
 	glm::vec3 get_scale() const
 	{
 		return get_transform_ref().scale;
@@ -513,7 +713,19 @@ public:
 
 	//--- upload/change model--------------------------------------------------------------------
 
-	/// <param name="tranpose_inverse_transform_attrib_index_in">if -1 or smaller, dont upload transpose inverse transform</param>
+	/// <summary>
+	///     Sets the active model and initializes its instance region.
+	/// </summary>
+	/// <remarks>
+	///     Reserves a class region for instance data and configures transform attribute indices.
+	///     If model is null, disables all transform-related attributes.
+	/// </remarks>
+	/// <param name="new_model">[in] Model to set as active.</param>
+	/// <param name="region_size">[in] Number of instance slots to reserve.</param>
+	/// <param name="transform_attrib_index_in">[in] Attribute index for world transform matrix.</param>
+	/// <param name="tranpose_inverse_transform_attrib_index_in">
+	/// [in] If -1 or smaller, disables uploading of transpose-inverse transform.
+	/// </param>
 	static void set_model(game_object_basic_model* new_model, const unsigned int region_size,
 		int transform_attrib_index_in = 3, int tranpose_inverse_transform_attrib_index_in = 7)
 	{
@@ -536,7 +748,15 @@ public:
 		}
 	}
 
-	//you can call it with a negative to make it smaller
+	/// <summary>
+	///     Expands or shrinks the object's instance region size.
+	/// </summary>
+	/// <remarks>
+	///     Can be called with a negative value to reduce region size, but never below zero.
+	///     Updates the model's instance buffer layout accordingly.
+	/// </remarks>
+	/// <param name="additional_size">[in] Amount to add (or subtract if negative) from current region size.</param>
+	/// <returns>New region size, or -1 on failure.</returns>
 	static int expand_region(const int additional_size)
 	{
 		if (model == nullptr || region == nullptr)
@@ -555,6 +775,17 @@ public:
 	}
 
 	//--- draw -----------------------------------------------------------------------------------
+
+	/// <summary>
+	///     Draws the object using its bound model and instance region.
+	/// </summary>
+	/// <remarks>
+	///     If amount is 0, draws the full region. If amount exceeds region size,
+	///     it is clamped to region size.
+	/// </remarks>
+	/// <param name="shader">[in] Shader used for rendering.</param>
+	/// <param name="amount">[in] Number of instances to draw (0 = full region).</param>
+	/// <returns>0 on success, -1 if model is not set.</returns>
 	static int draw(Shader& shader,unsigned int amount = 0)
 	{
 		if (model == nullptr)
@@ -580,6 +811,14 @@ public:
 namespace Global_object_map
 {
 
+	/// <summary>
+	///     Registers a game object in the global object map.
+	/// </summary>
+	/// <remarks>
+	///     Stores the object pointer using its unique ID as the key.
+	///     ID 0 is considered invalid and will be rejected.
+	/// </remarks>
+	/// <param name="obj">[in] Pointer to the object to register.</param>
 	inline void register_object(game_object_base* obj)
 	{
 		unsigned int id = obj->get_id();
@@ -597,11 +836,23 @@ namespace Global_object_map
 		object_list[id] = obj;
 	}
 
+	/// <summary>
+	///     Removes a game object from the global object map.
+	/// </summary>
+	/// <param name="id">[in] ID of the object to unregister.</param>
 	inline void unregister_object(unsigned int id)
 	{
 		object_list.erase(id);
 	}
 
+	/// <summary>
+	///     Retrieves a game object from the global object map by ID.
+	/// </summary>
+	/// <remarks>
+	///     Returns nullptr if the ID is invalid or the object is not found.
+	/// </remarks>
+	/// <param name="id">[in] Unique object ID.</param>
+	/// <returns>Pointer to the game object, or nullptr if not found.</returns>
 	inline game_object_base* get_object(unsigned int id)
 	{
 		if(id == 0)

@@ -9,6 +9,7 @@
 #include "The_event_manager.h"
 #include "Headers/game_object_basic.h"
 #include "Headers/ray_casting.h"
+#include "UI_Manager.h"
 
 bool camera_control = false;
 
@@ -45,6 +46,8 @@ public:
 
 TextRenderer* printer;
 camera_test* fps_camera;
+UI_manager ui_manager;
+
 void framebuffer_size_callback(GLFWwindow* /*window*/, int width, int height)
 {
 	const float new_aspect_ratio = (float)width / (float)height;
@@ -175,10 +178,30 @@ int main()
 	printer->change_deleted_colors(1, glm::vec4(1.0f, 1.0f, 1.0f, 1.0f), 1.5f, glm::vec4(1.0f, 0.0f, 0.0f, 1.0f));
 	printer->push_deleted_colors();
 
+
 	glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
 
 	Shader shader("Shaders/Vertex_shaders/Loaded_model_vertex.vert",
 		"Shaders/Fragment_shaders/Loaded_model_fragment.frag");
+
+	Shader ui_shader("Shaders/Vertex_shaders/Ui_vertex.vert",
+		"Shaders/Fragment_shaders/Ui_fragment.frag");
+
+	Button* addButton = new Button(
+		glm::vec2(-0.95f, 0.0f),
+		glm::vec2(0.8f, 0.4f),
+		"Ekle",
+		[]() { std::cout << "clicked\n"; },
+		&ui_shader,
+		printer
+	);
+
+	ui_manager.add_widget(addButton);
+
+	addButton->set_color({ 0.0f, 0.6f, 5.2f, 1.0f });
+	addButton->set_text_scale(2.3f);
+
+
 
 	Light sun = {false, glm::vec3(0.0), glm::vec3(0.0,-1.0,0.0), glm::vec3(1.0,1.0,1.0), glm::vec3(5.0,5.0,5.0), glm::vec3(0.5f,0.5f,0.5f),0,0,0,0,0};
 	
@@ -411,8 +434,12 @@ int main()
 		game_object_base::Tick(global_registry);
 		camera_control = glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_RIGHT) == GLFW_PRESS;
 
+		bool mouse_clicked = glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS;
+
 		processInput(window, 0.1f * (float)((glfwGetTime() - time_of_last_frame) / Target_frame_time), fps_camera);
 		time_of_last_frame = glfwGetTime();
+
+		ui_manager.update(0.0f, 0.0f, mouse_clicked);
 
 		glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -438,6 +465,8 @@ int main()
 		}
 		printer->render_text(fps_text, -1.0f, 0.9f, 2.0f);
 		Logger::checkGLError("After drawing fps");
+
+		ui_manager.render();
 
 		pointer_arrow.rotate(glm::vec3(0.0f, 0.005f, 0.0f));
 

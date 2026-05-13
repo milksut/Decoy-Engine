@@ -40,6 +40,18 @@ namespace Ray_casting
         return rayDir;
     }
 
+    /// <summary>
+    ///     Computes ray-sphere intersection distance.
+    /// </summary>
+    /// <remarks>
+    ///     Returns the nearest positive hit distance (t) if intersection exists,
+    ///     otherwise returns -1.
+    /// </remarks>
+    /// <param name="ray_origin">[in] Origin of the ray.</param>
+    /// <param name="ray_dir">[in] Normalized ray direction.</param>
+    /// <param name="sphere_center">[in] Center of the sphere.</param>
+    /// <param name="radius">[in] Sphere radius.</param>
+    /// <returns>Distance along ray to intersection, or -1 if no hit.</returns>
     float ray_sphere_intersection(const glm::vec3& ray_origin, const glm::vec3& ray_dir,
         const glm::vec3& sphere_center, float radius)
     {
@@ -64,6 +76,15 @@ namespace Ray_casting
         return -1.0f;
     }
 
+    /// <summary>
+    ///     Checks if an object is inside a simplified view frustum (cone + distance test).
+    /// </summary>
+    /// <param name="camera_pos">[in] Camera world position.</param>
+    /// <param name="camera_front">[in] Camera forward direction.</param>
+    /// <param name="object_pos">[in] Object world position.</param>
+    /// <param name="max_distance">[in] Maximum visible distance.</param>
+    /// <param name="fov_cosine">[in] Precomputed cosine of half FOV angle.</param>
+    /// <returns>True if object is within view cone and distance range.</returns>
     bool is_in_frustum(const glm::vec3& camera_pos,  const glm::vec3& camera_front, const glm::vec3& object_pos,
         float max_distance, float fov_cosine)
     {

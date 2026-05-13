@@ -910,6 +910,15 @@ public:
 
 	}
 
+	/// <summary>
+	///     Applies a transformation matrix directly to mesh vertices and normals.
+	/// </summary>
+	/// <remarks>
+	///     Transforms vertex positions using the given matrix and correctly updates normals
+	///     using the inverse-transpose of the rotation part. Then uploads the updated mesh data.
+	/// </remarks>
+	/// <param name="mesh_index">[in] Index of the mesh to modify.</param>
+	/// <param name="transform">[in] Transformation matrix to apply to vertices.</param>
 	void offset_mesh_vertices(const unsigned int mesh_index, const glm::mat4 transform)
 	{
 		if(Meshes.size() <= mesh_index)
@@ -942,6 +951,17 @@ public:
 	}
 
 	//unneded? maybe just use a for loop?
+
+	/// <summary>
+	///     Applies a transformation matrix to a range of meshes.
+	/// </summary>
+	/// <remarks>
+	///     Iterates from start to end mesh index and applies vertex transformation
+	///     (position and normal update) to each mesh.
+	/// </remarks>
+	/// <param name="mesh_index_start">[in] First mesh index in range.</param>
+	/// <param name="mesh_index_end">[in] Last mesh index in range (inclusive).</param>
+	/// <param name="transform">[in] Transformation matrix to apply.</param>
 	void offset_mesh_vertices(const unsigned int mesh_index_start, const unsigned int mesh_index_end, const glm::mat4 transform)
 	{
 		if (Meshes.size() <= mesh_index_start)
@@ -961,6 +981,13 @@ public:
 		}
 	}
 
+	/// <summary>
+	///     Applies a transformation matrix to all meshes in the container.
+	/// </summary>
+	/// <remarks>
+	///     Calls the ranged offset_mesh_vertices overload using full mesh range (0 to size-1).
+	/// </remarks>
+	/// <param name="transform">[in] Transformation matrix to apply to all meshes.</param>
 	void offset_mesh_vertices(const glm::mat4 transform)
 	{
 		offset_mesh_vertices((unsigned int)0, (unsigned int)Meshes.size() - 1, transform);
