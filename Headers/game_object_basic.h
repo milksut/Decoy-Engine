@@ -529,9 +529,33 @@ protected:
 			region->object_ptrs[region_slot_index] = nullptr;
 
 		Global_object_map::unregister_object(id);
+
+		if (registry.valid(this_object))     
+			registry.destroy(this_object);
 	}
 
 public:
+
+	/// <summary>
+	///     Returns the object's slot index inside its class region.
+	/// </summary>
+	/// <returns>Region slot index.</returns>
+	int get_region_slot_index() const
+	{
+		return region_slot_index;
+	}
+
+	/// <summary>
+	///     Moves the object to a different slot inside its class region.
+	/// </summary>
+	/// <param name="new_slot">[in] Target region slot index.</param>
+	void move_to_slot(int new_slot)
+	{
+		swap_region_index(new_slot);
+		is_pos_changed_flag = true;
+		is_any_child_pos_changed_flag = true;
+		should_upload_flag = true;
+	}
 
 	/// <summary>
 	///     Returns the unique ID of the game object.
