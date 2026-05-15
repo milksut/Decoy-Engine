@@ -20,6 +20,7 @@ const bool enable_vSync = false;
 unsigned int screen_width = 800, screen_height = 600;
 const float aspect_ratio = (float)screen_width / (float)screen_height;
 
+game_object_basic_model backpack;
 
 Event_manager manager;
 Input_Manager* my_input_manager;
@@ -43,6 +44,10 @@ public:
 		: game_object_basic(reg, tag)
 	{}
 };
+
+std::unordered_map<unsigned int, Tree*> tree_map;
+unsigned int selected_id = 0;
+entt::entity selected_entity = entt::null;
 
 TextRenderer* printer;
 camera_test* fps_camera;
@@ -190,8 +195,44 @@ int main()
 	Button* addButton = new Button(
 		glm::vec2(-0.95f, 0.0f),
 		glm::vec2(0.8f, 0.4f),
-		"Ekle",
-		[]() { std::cout << "clicked\n"; },
+		"Sil",
+		[]()
+		{
+			if (selected_id != 0)
+			{
+				auto it = tree_map.find(selected_id);
+				if (it != tree_map.end())
+				{
+					Tree* t = it->second;
+					auto region = Tree::get_class_region();
+					int deleted_slot = t->get_region_slot_index();
+
+					int last_slot = (int)region->object_ptrs.size() - 1;
+					while (last_slot >= 0 && region->object_ptrs[last_slot] == nullptr)
+						last_slot--;
+
+
+					if (last_slot >= 0 && last_slot != deleted_slot)
+					{
+						game_object_basic<Tree>* last_obj = static_cast<game_object_basic<Tree>*>(region->object_ptrs[last_slot]);
+						last_obj->move_to_slot(deleted_slot);
+						glm::mat4 world = last_obj->get_transform_copy().world;
+						backpack.load_instance_buffer(
+							reinterpret_cast<float*>(&world),
+							1,
+							3,
+							region,
+							(unsigned int)deleted_slot
+						);
+					}
+
+					delete t;
+					tree_map.erase(it);
+				}
+				selected_entity = entt::null;
+				selected_id = 0;
+			}
+		},
 		&ui_shader,
 		printer
 	);
@@ -226,7 +267,6 @@ int main()
 
 	Logger::checkGLError("After loading light");
 
-	game_object_basic_model backpack;
 
 	backpack.import_model_from_file("Models\\Tree1.obj");
 	
@@ -242,6 +282,7 @@ int main()
 		{
 			Tree* t = new Tree(global_registry, "Tree_" + std::to_string(i) + "_" + std::to_string(j));
 			t->set_position({ i * 5.0f, 0.0f, j * 5.0f });
+			tree_map[t->get_id()] = t;
 		}
 	}
 
@@ -276,7 +317,7 @@ int main()
 	//-------------------------------------------------------------------------------------------------------------
 	my_input_manager = new Input_Manager(manager,window);
 
-	Event_management::Event_receiver_shared click_receiver = Event_management::make_receiver([&pointer_arrow](const Event_management::Event& e)
+	Event_management::Event_receiver_shared click_receiver =Event_management::make_receiver([&pointer_arrow](const Event_management::Event& e)
 		{
 			if (e.type == Event_management::Event_type::Mouse_button_pressed)
 			{
@@ -318,6 +359,8 @@ int main()
 					LOG_INFO("Selected: %s pos: %.2f, %.2f, %.2f", tag.tag.c_str(),
 						transform.position.x, transform.position.y, transform.position.z);
 
+					selected_entity = closest_entity;
+					selected_id = global_registry.get<Id_component>(closest_entity).id;
 					pointer_arrow.set_position(glm::vec3(transform.position.x, pointer_arrow.get_position().y, transform.position.z));
 				}
 			}
@@ -356,7 +399,6 @@ int main()
 
 	shader.bind_UBO("projectionXview_block",fps_camera->Ubo_slot);
 
-	
 	while (!glfwWindowShouldClose(window))
 	{
 
@@ -452,10 +494,17 @@ int main()
 
 		bool mouse_clicked = glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS;
 
+		//mouse position in NDC for UI interactions
+		double mouse_xd, mouse_yd;
+		glfwGetCursorPos(window, &mouse_xd, &mouse_yd);
+
+		float mouse_ndc_x = (float)(mouse_xd / screen_width) * 2.0f - 1.0f;
+		float mouse_ndc_y = 1.0f - (float)(mouse_yd / screen_height) * 2.0f;
+
 		processInput(window, 0.1f * (float)((glfwGetTime() - time_of_last_frame) / Target_frame_time), fps_camera);
 		time_of_last_frame = glfwGetTime();
 
-		ui_manager.update(0.0f, 0.0f, mouse_clicked);
+		ui_manager.update(mouse_ndc_x, mouse_ndc_y, mouse_clicked);
 
 		glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
