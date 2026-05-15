@@ -278,10 +278,18 @@ private:
 
 		int temp = region_slot_index;
 		region_slot_index = new_index;
+		
+		if (temp >= 0 && temp < region->object_ptrs.size())
+		{
+			region->object_ptrs[temp] = nullptr;
+		}
 
-		region->object_ptrs[temp] = nullptr;
-		region->object_ptrs[region_slot_index] = this;
-
+		if (region_slot_index >= 0 && region_slot_index < region->object_ptrs.size())
+		{
+			
+			region->object_ptrs[region_slot_index] = this;
+		}
+		
 		set_should_upload_flag(true);
 		return temp;
 	}
@@ -515,7 +523,8 @@ protected:
 				}
 				else
 				{
-					LOG_ERROR("Game_object_basic, There is not enough space in region, object Cant be Created.");
+					//This is now intended use, you can have objects that dont be drawn
+					//LOG_ERROR("Game_object_basic, There is not enough space in region, object Cant be Created.");
 				}
 			}
 		}
@@ -573,7 +582,7 @@ public:
 		}
 		else if (region->object_ptrs[null_region_index] != nullptr)
 		{
-			LOG_ERROR("Game_object_basic: Slot %d is not empty, cannot assign object here!", null_region_index);
+ 			LOG_ERROR("Game_object_basic: Slot %d is not empty, cannot assign object here!", null_region_index);
 			return;
 		}
 
@@ -595,7 +604,7 @@ public:
 			return;
 		}
 
-		game_object_base* ptr = Global_object_map::get_object(id);
+		game_object_base* ptr = Global_object_map::get_object(other_object_id);
 
 		if(ptr == nullptr)
 		{
@@ -772,6 +781,18 @@ public:
 			
 		model->reserve_additional_region(additional_size + region->size_in_number, region);
 		return additional_size + region->size_in_number;
+	}
+
+	//TODO: turn this into a entt comp and update when transform changes
+	AABB get_world_aabb()
+	{
+		if (model == nullptr)
+		{
+			LOG_WARNING("Game_object_basic: cant get aabb, there is no defined model!");
+			return AABB();
+		}
+
+		return game_object_basic_model::Mesh::get_world_aabb(model->Meshes[0]->bounding_box, get_transform_ref().world);
 	}
 
 	//--- draw -----------------------------------------------------------------------------------

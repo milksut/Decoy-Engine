@@ -31,7 +31,7 @@ static const aiTextureType Assimp_Tex_Types_2[] =
 
 class game_object_basic_model
 {
-private:
+public:
 	class Mesh
 	{
 	private:
@@ -147,11 +147,72 @@ private:
 		}
 
 
-	public:
+public:
+		static AABB calculate_aabb(const std::vector<glm::vec3>& vertices)
+		{
+			glm::vec3 min(FLT_MAX);
+			glm::vec3 max(-FLT_MAX);
+
+			for (const auto& v : vertices)
+			{
+				min.x = std::min(min.x, v.x);
+				min.y = std::min(min.y, v.y);
+				min.z = std::min(min.z, v.z);
+
+				max.x = std::max(max.x, v.x);
+				max.y = std::max(max.y, v.y);
+				max.z = std::max(max.z, v.z);
+			}
+			return { min, max };
+		}
+
+		static AABB calculate_aabb(const std::vector<vertex_data>& vertices)
+		{
+			glm::vec3 min(FLT_MAX);
+			glm::vec3 max(-FLT_MAX);
+			for (const auto& v : vertices)
+			{
+				min.x = std::min(min.x, v.position[0]);
+				min.y = std::min(min.y, v.position[1]);
+				min.z = std::min(min.z, v.position[2]);
+				max.x = std::max(max.x, v.position[0]);
+				max.y = std::max(max.y, v.position[1]);
+				max.z = std::max(max.z, v.position[2]);
+			}
+			return { min, max };
+		}
+
+		static AABB get_world_aabb(const AABB& local, const glm::mat4& model)
+		{
+			glm::vec3 corners[8] = {
+				{local.min.x, local.min.y, local.min.z},
+				{local.max.x, local.min.y, local.min.z},
+				{local.min.x, local.max.y, local.min.z},
+				{local.max.x, local.max.y, local.min.z},
+				{local.min.x, local.min.y, local.max.z},
+				{local.max.x, local.min.y, local.max.z},
+				{local.min.x, local.max.y, local.max.z},
+				{local.max.x, local.max.y, local.max.z},
+			};
+
+			AABB world;
+			world.min = glm::vec3(FLT_MAX);
+			world.max = glm::vec3(-FLT_MAX);
+
+			for (auto& c : corners) {
+				glm::vec3 wc = glm::vec3(model * glm::vec4(c, 1.0f));
+				world.min = glm::min(world.min, wc);
+				world.max = glm::max(world.max, wc);
+			}
+			return world;
+		}
+
 		std::vector<vertex_data>  main_vertices;
 		std::vector<unsigned int> main_indices;
 		std::vector<Texture>      main_textures;
 		std::shared_ptr<class_region> last_bound_region = nullptr;
+		AABB bounding_box = {};
+
 
 		//material properties for this mesh:
 		unsigned int mesh_material_id = 0;
@@ -178,6 +239,8 @@ private:
 			{
 				glBindBuffer(GL_ARRAY_BUFFER, VBO_Mesh);
 				glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(vertex_data), &vertices[0], GL_STATIC_DRAW);	
+
+				bounding_box = calculate_aabb(vertices);
 			}
 			else
 			{
@@ -244,11 +307,12 @@ private:
 		///     Updates mesh vertex, index, and texture data on the GPU.
 		/// </summary>
 		/// <param name="vertices">[in] New vertex data for the mesh.</param>
+		/// <param name="update_aabb">[in] If true, recalculates the axis-aligned bounding box based on new vertex data.</param>
 		/// <param name="indices">[in] New index data for the mesh.</param>
 		/// <param name="textures">[in] New textures associated with the mesh.</param>
 		/// <param name="use_dynamic_draw">[in] If true, uses dynamic draw for buffer updates.</param>
-		void update_mesh(const std::vector<vertex_data> &vertices,const std::vector<unsigned int> &indices = std::vector<unsigned int>(),
-			const std::vector<Texture>& textures = std::vector<Texture>(), bool use_dynamic_draw = false)
+		void update_mesh(const std::vector<vertex_data> &vertices,const bool update_aabb = true,const std::vector<unsigned int> &indices = std::vector<unsigned int>(),
+			const std::vector<Texture>& textures = std::vector<Texture>() ,bool use_dynamic_draw = false)
 		{
 
 			glBindVertexArray(VAO);
@@ -264,6 +328,11 @@ private:
 
 				glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(vertex_data), &vertices[0],
 					use_dynamic_draw ? GL_DYNAMIC_DRAW : GL_STATIC_DRAW);//new
+
+				if (update_aabb)
+				{
+					bounding_box = calculate_aabb(vertices);
+				}
 			}
 			else
 			{
@@ -919,7 +988,8 @@ public:
 	/// </remarks>
 	/// <param name="mesh_index">[in] Index of the mesh to modify.</param>
 	/// <param name="transform">[in] Transformation matrix to apply to vertices.</param>
-	void offset_mesh_vertices(const unsigned int mesh_index, const glm::mat4 transform)
+	/// <param name="update_aabb">[in] If true, recalculates the axis-aligned bounding box after transformation (default = true).</param>
+	void offset_mesh_vertices(const unsigned int mesh_index, const glm::mat4 transform, bool update_aabb = true)
 	{
 		if(Meshes.size() <= mesh_index)
 		{
@@ -947,7 +1017,7 @@ public:
 			v.normal[2] = new_normal.z;
 		}
 
-		Meshes[mesh_index]->update_mesh(vertices);
+		Meshes[mesh_index]->update_mesh(vertices, update_aabb);
 	}
 
 	//unneded? maybe just use a for loop?
@@ -962,7 +1032,8 @@ public:
 	/// <param name="mesh_index_start">[in] First mesh index in range.</param>
 	/// <param name="mesh_index_end">[in] Last mesh index in range (inclusive).</param>
 	/// <param name="transform">[in] Transformation matrix to apply.</param>
-	void offset_mesh_vertices(const unsigned int mesh_index_start, const unsigned int mesh_index_end, const glm::mat4 transform)
+	/// <param name="update_aabb">[in] If true, recalculates the axis-aligned bounding box after transformation (default = true).</param>
+	void offset_mesh_vertices(const unsigned int mesh_index_start, const unsigned int mesh_index_end, const glm::mat4 transform, bool update_aabb = true)
 	{
 		if (Meshes.size() <= mesh_index_start)
 		{
@@ -977,7 +1048,7 @@ public:
 
 		for(unsigned int i = mesh_index_start; i <= mesh_index_end; i++)
 		{
-			offset_mesh_vertices(i, transform);
+			offset_mesh_vertices(i, transform, update_aabb);
 		}
 	}
 
@@ -988,9 +1059,10 @@ public:
 	///     Calls the ranged offset_mesh_vertices overload using full mesh range (0 to size-1).
 	/// </remarks>
 	/// <param name="transform">[in] Transformation matrix to apply to all meshes.</param>
-	void offset_mesh_vertices(const glm::mat4 transform)
+	/// <param name="update_aabb">[in] If true, recalculates the axis-aligned bounding box after transformation (default = true).</param>
+	void offset_mesh_vertices(const glm::mat4 transform, bool update_aabb = true)
 	{
-		offset_mesh_vertices((unsigned int)0, (unsigned int)Meshes.size() - 1, transform);
+		offset_mesh_vertices((unsigned int)0, (unsigned int)Meshes.size() - 1, transform, update_aabb);
 	}
 
 };

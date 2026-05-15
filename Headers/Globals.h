@@ -13,16 +13,6 @@
 #define MAX_MATERIALS        128  // max materials in UBO array, can be increased if needed, but keep in mind that UBOs have size limits (usually around 64KB)
 //end of defines---------------------------------------------------------------------------------
 
-//Enums -----------------------------------------------------------------------------------------
-enum Key_state
-{
-	Idle,    //While the key is free
-	Pressed,// When the key is first pressed
-	Hold,   // While the key is hold
-	Released// When the key is first released
-};
-//end of enums-----------------------------------------------------------------------------------
-
 
 
 //Includes----------------------------------------------------------------------------------------
@@ -51,7 +41,6 @@ enum Key_state
 #include <cstdarg>
 
 
-
 #ifdef _WIN32
 #include <direct.h>
 #define MKDIR(path) _mkdir(path)
@@ -66,6 +55,18 @@ enum Key_state
 #define STAT_FUNC   stat
 #endif
 //end of includes---------------------------------------------------------------------------------
+
+
+
+//Enums -----------------------------------------------------------------------------------------
+enum Key_state
+{
+	Idle,    //While the key is free
+	Pressed,// When the key is first pressed
+	Hold,   // While the key is hold
+	Released// When the key is first released
+};
+//end of enums-----------------------------------------------------------------------------------
 
 
 
@@ -137,11 +138,41 @@ struct Texture
 	std::string path = "";
 };
 
+struct AABB
+{
+	glm::vec3 min = glm::vec3(0.0f);
+	glm::vec3 max = glm::vec3(0.0f);
+};
+
+struct Plane {
+	glm::vec3 normal; // which direction the plane faces (points INWARD)
+	float d;          // distance offset from origin
+};
+
+struct Frustum {
+	Plane planes[6];  // left, right, bottom, top, near, far
+};
+
 struct vertex_data
 {
 	float position[3];
 	float tex_coords[2];
 	float normal[3];
+};
+
+struct class_region //VBO regions given to classes and data inside them
+{
+	unsigned int offset_in_numbers = 0;//how many meshes can be drawn before this region
+	unsigned int size_in_number = 0;//how many meshes can be drawn using this region
+
+	//TODO: pointers will be changed to use EnTT system
+	std::vector<std::shared_ptr<float>> data_ptrs;//datas for this region, vector index -> attribute index, and pointer for data
+	std::vector<unsigned int> data_amount;//amount of floats in data_ptr
+
+	//pointers to individual objects in this region, null* means currently no object using that slot, and can be used for new objects.
+	//used for object deletion/addition without changing offsets of other objects in the region, 
+	//and for tracking which object is where in the region, so we can batch upload when sequential objects changed (buffersubdata)
+	std::vector<void*> object_ptrs;
 };
 
 struct Light {
@@ -159,21 +190,6 @@ struct Light {
 	float constant;
 	float linear;
 	float quadratic;
-};
-
-struct class_region //VBO regions given to classes and data inside them
-{
-	unsigned int offset_in_numbers = 0;//how many meshes can be drawn before this region
-	unsigned int size_in_number = 0;//how many meshes can be drawn using this region
-
-	//TODO: pointers will be changed to use EnTT system
-	std::vector<std::shared_ptr<float>> data_ptrs;//datas for this region, vector index -> attribute index, and pointer for data
-	std::vector<unsigned int> data_amount;//amount of floats in data_ptr
-
-	//pointers to individual objects in this region, null* means currently no object using that slot, and can be used for new objects.
-	//used for object deletion/addition without changing offsets of other objects in the region, 
-	//and for tracking which object is where in the region, so we can batch upload when sequential objects changed (buffersubdata)
-	std::vector<void*> object_ptrs;
 };
 
 struct material_properties

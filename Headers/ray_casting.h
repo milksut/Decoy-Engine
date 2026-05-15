@@ -1,6 +1,7 @@
 #pragma once
 
 #include <glm/glm.hpp>
+#include <Camera_test.h>
 
 namespace Ray_casting
 {
@@ -104,5 +105,54 @@ namespace Ray_casting
         // If dot is greater than cos(fov/2), object is inside view cone
         return dot > fov_cosine;
     }
+
+    bool aabb_in_frustum(const Frustum& f, const AABB& world)
+    {
+        for (const auto& p : f.planes)
+        {
+            // Pick the corner most aligned with the plane normal
+            glm::vec3 positive = {
+                p.normal.x >= 0 ? world.max.x : world.min.x,
+                p.normal.y >= 0 ? world.max.y : world.min.y,
+                p.normal.z >= 0 ? world.max.z : world.min.z
+            };
+
+            if (glm::dot(p.normal, positive) + p.d < 0.0f)
+                return false; // entirely outside this plane
+        }
+        return true;
+    }
+
+    Frustum extract_frustum(const glm::mat4& pv)
+    {
+        Frustum f;
+
+        // Each plane is extracted from a row combination of the matrix
+        // The math here is the Gribb/Hartmann method — standard and reliable
+        f.planes[0] = { {pv[0][3] + pv[0][0], pv[1][3] + pv[1][0], pv[2][3] + pv[2][0]}, pv[3][3] + pv[3][0] }; // left
+        f.planes[1] = { {pv[0][3] - pv[0][0], pv[1][3] - pv[1][0], pv[2][3] - pv[2][0]}, pv[3][3] - pv[3][0] }; // right
+        f.planes[2] = { {pv[0][3] + pv[0][1], pv[1][3] + pv[1][1], pv[2][3] + pv[2][1]}, pv[3][3] + pv[3][1] }; // bottom
+        f.planes[3] = { {pv[0][3] - pv[0][1], pv[1][3] - pv[1][1], pv[2][3] - pv[2][1]}, pv[3][3] - pv[3][1] }; // top
+        f.planes[4] = { {pv[0][3] + pv[0][2], pv[1][3] + pv[1][2], pv[2][3] + pv[2][2]}, pv[3][3] + pv[3][2] }; // near
+        f.planes[5] = { {pv[0][3] - pv[0][2], pv[1][3] - pv[1][2], pv[2][3] - pv[2][2]}, pv[3][3] - pv[3][2] }; // far
+
+        // Normalize so the dot product test gives real distances
+        for (auto& p : f.planes) {
+            float len = glm::length(p.normal);
+            p.normal /= len;
+            p.d /= len;
+        }
+        return f;
+    }
+
+    Frustum extract_frustum(const glm::mat4& projection, const glm::mat4& view)
+    {
+        return extract_frustum(projection * view);
+	}
+
+    Frustum extract_frustum(const camera_test& cam)
+    {
+        return extract_frustum(cam.projection, cam.view);
+	}
 
 }

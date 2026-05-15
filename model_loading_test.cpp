@@ -25,7 +25,7 @@ Event_manager manager;
 Input_Manager* my_input_manager;
 
 //-*-*-*-*-*-*-*-**-*-*-*-*-**-*-*-*-*-*-*-*-*-*-*-*-*-*-*-**-*-*-*-*-*-*-*-*
-int grid_amount = 60;
+int grid_amount = 100;
 //-*-*-*-*-*-*-*-**-*-*-*-*-**-*-*-*-*-*-*-*-*-*-*-*-*-*-*-**-*-*-*-*-*-*-*-*
 
 class Tree : public game_object_basic<Tree> {
@@ -54,7 +54,7 @@ void framebuffer_size_callback(GLFWwindow* /*window*/, int width, int height)
 
 	glViewport(0, 0, width, height);
 
-	fps_camera->update_projection(45.0f, new_aspect_ratio, 0.1f, 1000.0f);
+	fps_camera->update_projection(45.0f, new_aspect_ratio, 0.1f, 500.0f);
 	printer->change_screen_size(width, height);
 
 	screen_width = width;
@@ -163,8 +163,8 @@ int main()
 	}
 
 	glfwSwapInterval(enable_vSync);
-	fps_camera = new camera_test(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 0.0f));
-	fps_camera->update_projection(45.0f, aspect_ratio, 0.1f, 1000.0f);
+	fps_camera = new camera_test(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(270.0f, 0.0f, 0.0f));
+	fps_camera->update_projection(45.0f, aspect_ratio, 0.1f, 500.0f);
 
 	printer = new TextRenderer("Textures/Font_texture_Atlas/DejaVu Sans Mono_512X256_16x32.png",
 		"Textures/Font_texture_Atlas/DejaVu Sans Mono_512X256_16x32.txt",
@@ -234,7 +234,7 @@ int main()
 
 	backpack.add_instance_buffer(9, 7); //attrib size-mat3-12floats, attrib index, for transpose_inverse_viewXmodel
 
-	Tree::set_model(&backpack, grid_amount * grid_amount, 3);
+	Tree::set_model(&backpack, grid_amount* grid_amount, 3);
 
 	for (int i = 0; i < grid_amount; i++)
 	{
@@ -360,76 +360,92 @@ int main()
 	while (!glfwWindowShouldClose(window))
 	{
 
-		//// Frustum culling test start --------------------------------------------------------------
-		//float fov = 10.0f;
-		//float fov_cosine = cos(glm::radians(fov / 2.0f));
+		// Frustum culling test start --------------------------------------------------------------
 
-		//std::unordered_set<unsigned int> visible_list;
-		//std::unordered_set<int> available_indices;
+		Frustum frustum = Ray_casting::extract_frustum(*fps_camera);
 
-		//auto view = global_registry.view<Transform_component, Id_component, Tag_component >();
+		std::vector<unsigned int> visible_list;
+		std::vector<int> available_indices;
 
-		//view.each([&fov_cosine, &visible_list](auto /*entity*/, Transform_component& transform,
-		//	Id_component& id_comp, Tag_component& tag_comp)
-		//{
-		//	if (tag_comp.tag.find("Tree") == std::string::npos)
-		//	{
-		//		return; //only check entities with "Tree" in their tag
-		//	}
-		//			
-		//	if (Ray_casting::is_in_frustum(fps_camera->camera_position,
-		//		fps_camera->camera_front, transform.position, 100.0f, fov_cosine))
-		//	{
-		//		visible_list.insert(id_comp.id);
-		//	}
-		//});
+		std::vector<void*>& region = Tree::get_class_region()->object_ptrs;
+		unsigned int region_size = region.size();
 
-		//const unsigned int visible_amount = (unsigned int)visible_list.size();
+		visible_list.reserve(region_size * 10);
+		available_indices.reserve(region_size);
 
-		//std::vector<void*> region = Tree::get_class_region()->object_ptrs;
+		auto view = global_registry.view<Transform_component, Id_component, Tag_component >();
 
-		//for(unsigned int i =0; i < visible_amount; i++)
-		//{
-		//	game_object_base* ptr = static_cast<game_object_base*>(region[i]);
+		view.each([&visible_list, &frustum](auto /*entity*/, Transform_component& /*transform*/,
+			Id_component& id_comp, Tag_component& tag_comp)
+			{
 
-		//	if(ptr == nullptr)
-		//	{
-		//		available_indices.insert(i);
-		//		continue;
-		//	}
+				if (tag_comp.tag.find("Tree") == std::string::npos)
+				{
+					return; //only check entities with "Tree" in their tag
+				}
 
-		//	unsigned int temp_id = ptr->get_id();
+				if (Ray_casting::aabb_in_frustum(frustum, static_cast<game_object_basic<Tree>*>(Global_object_map::get_object(id_comp.id))->get_world_aabb()))
+				{
+					visible_list.push_back(id_comp.id);
+				}
+			});
 
-		//	if(visible_list.find(temp_id) != visible_list.end())
-		//	{
-		//		visible_list.erase(temp_id);
-		//		continue;
-		//	}
-		//	else
-		//	{
-		//		available_indices.insert(i);
-		//		continue;
-		//	}
-		//}
+		const unsigned int visible_amount = (unsigned int)visible_list.size();
 
-		//for(unsigned int id : visible_list)
-		//{
-		//	auto it = available_indices.begin();
-		//	int new_index = *it;
-		//	available_indices.erase(it);
 
-		//	void* obj_ptr = region[new_index];
-		//	if(obj_ptr == nullptr)
-		//	{
-		//		Global_object_map::get_object(id)->use_null_region_pos(new_index);
-		//	}
-		//	else
-		//	{
-		//		static_cast<game_object_base*>(obj_ptr)->swap_region_pos(id);
-		//	}
-		//}
 
-		//// Frustum culling test end -----------------------------------------------------------------
+		for (unsigned int i = 0; i < visible_amount && i < region_size; i++)
+		{
+			game_object_base* ptr = static_cast<game_object_base*>(region[i]);
+
+			if (ptr == nullptr)
+			{
+				available_indices.push_back(i);
+				continue;
+			}
+
+			unsigned int temp_id = ptr->get_id();
+
+			auto index = std::find(visible_list.begin(), visible_list.end(), temp_id);
+
+			if (index != visible_list.end())
+			{
+				*index = 0;
+				continue;
+			}
+			else
+			{
+				available_indices.push_back(i);
+				continue;
+			}
+		}
+		int index_in_availble_list = 0;
+
+		for (unsigned int id : visible_list)
+		{
+			if (index_in_availble_list >= available_indices.size())
+			{
+				break;
+			}
+			if (id == 0)
+			{
+				continue;
+			}
+
+			int new_index = available_indices[index_in_availble_list++];
+			void* obj_ptr = region[new_index];
+
+			if (obj_ptr == nullptr)
+			{
+				Global_object_map::get_object(id)->use_null_region_pos(new_index);
+			}
+			else
+			{
+				static_cast<game_object_base*>(obj_ptr)->swap_region_pos(id);
+			}
+		}
+
+		// Frustum culling test end -----------------------------------------------------------------
 
 		game_object_base::Tick(global_registry);
 		camera_control = glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_RIGHT) == GLFW_PRESS;
@@ -447,7 +463,8 @@ int main()
 		shader.use();
 		shader.setVec3("viewPos", fps_camera->camera_position);
 
-		Tree::draw(shader);
+		if(visible_amount>0)
+			Tree::draw(shader, visible_amount);
 		Arrow::draw(shader);
 
 		Logger::checkGLError("After drawing grid backpack");
@@ -466,7 +483,7 @@ int main()
 		printer->render_text(fps_text, -1.0f, 0.9f, 2.0f);
 		Logger::checkGLError("After drawing fps");
 
-		ui_manager.render();
+		//ui_manager.render();
 
 		pointer_arrow.rotate(glm::vec3(0.0f, 0.005f, 0.0f));
 
