@@ -48,6 +48,7 @@ public:
 std::unordered_map<unsigned int, Tree*> tree_map;
 unsigned int selected_id = 0;
 entt::entity selected_entity = entt::null;
+Text_panel* info_panel = nullptr;
 
 TextRenderer* printer;
 camera_test* fps_camera;
@@ -194,7 +195,7 @@ int main()
 
 	Button* addButton = new Button(
 		glm::vec2(-0.95f, 0.0f),
-		glm::vec2(0.8f, 0.4f),
+		glm::vec2(0.3f, 0.2f),
 		"Sil",
 		[]()
 		{
@@ -242,7 +243,19 @@ int main()
 	addButton->set_color({ 0.0f, 0.6f, 5.2f, 1.0f });
 	addButton->set_text_scale(2.3f);
 
+	info_panel = new Text_panel(
+		glm::vec2(0.5f, -0.9f),
+		glm::vec2(0.4f, 0.3f),
+		&ui_shader,
+		printer
+	);
+	info_panel->set_background_color({ 0.1f, 0.1f, 0.1f, 0.8f });
+	info_panel->visible = false;
+	ui_manager.add_widget(info_panel);
 
+	info_panel->set_background_color({ 0.15f, 0.15f, 0.65f, 0.9f });
+	info_panel->set_text_scale(0.75f);
+	info_panel->set_line_spacing(0.08f);
 
 	Light sun = {false, glm::vec3(0.0), glm::vec3(0.0,-1.0,0.0), glm::vec3(1.0,1.0,1.0), glm::vec3(5.0,5.0,5.0), glm::vec3(0.5f,0.5f,0.5f),0,0,0,0,0};
 	
@@ -324,7 +337,11 @@ int main()
 				const auto& mouse = dynamic_cast<const Mouse_button_press_event&>(e);
 
 				if (mouse.key.code != GLFW_MOUSE_BUTTON_LEFT) return;
+				float mx = (float)(mouse.mouse_x / screen_width) * 2.0f - 1.0f;
+				float my = 1.0f - (float)(mouse.mouse_y / screen_height) * 2.0f;
 
+				if (ui_manager.is_hovered(mx, my))
+					return;
 
 				entt::entity closest_entity = entt::null;
 				float closest_distance = -1.0f;
@@ -362,6 +379,12 @@ int main()
 					selected_entity = closest_entity;
 					selected_id = global_registry.get<Id_component>(closest_entity).id;
 					pointer_arrow.set_position(glm::vec3(transform.position.x, pointer_arrow.get_position().y, transform.position.z));
+					info_panel->clear();
+					info_panel->set_line(0, "Tag: " + tag.tag);
+					info_panel->set_line(1, "Pos X: " + std::to_string(transform.position.x));
+					info_panel->set_line(2, "Pos Y: " + std::to_string(transform.position.y));
+					info_panel->set_line(3, "Pos Z: " + std::to_string(transform.position.z));
+					info_panel->visible = true;
 				}
 			}
 		});
@@ -532,7 +555,7 @@ int main()
 		printer->render_text(fps_text, -1.0f, 0.9f, 2.0f);
 		Logger::checkGLError("After drawing fps");
 
-		//ui_manager.render();
+		ui_manager.render();
 
 		pointer_arrow.rotate(glm::vec3(0.0f, 0.005f, 0.0f));
 

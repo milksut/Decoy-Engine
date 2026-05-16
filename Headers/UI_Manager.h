@@ -35,4 +35,14 @@ public:
                 widget->render();
         }
     }
+
+    bool is_hovered(float mouse_x, float mouse_y)
+    {
+        for (Widget* widget : widgets)
+        {
+            if (widget && widget->visible && widget->is_hovered(mouse_x, mouse_y))
+                return true;
+        }
+        return false;
+    }
 };
