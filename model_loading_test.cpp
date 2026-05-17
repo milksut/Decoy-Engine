@@ -243,6 +243,41 @@ int main()
 	addButton->set_color({ 0.0f, 0.6f, 5.2f, 1.0f });
 	addButton->set_text_scale(2.3f);
 
+	Button* addTreeButton = new Button(
+		glm::vec2(-0.95f, 0.5f),
+		glm::vec2(0.8f, 0.4f),
+		"Ekle",
+		[]()
+		{
+			glm::vec3 ray_dir = Ray_casting::ScreenToWorldRay(
+				(float)screen_width / 2.0f,
+				(float)screen_height / 2.0f,
+				screen_width, screen_height,
+				fps_camera->projection,
+				fps_camera->view
+			);
+
+			glm::vec3 pos = Ray_casting::ray_plane_intersection(
+				fps_camera->camera_position,
+				ray_dir,
+				0.0f
+			);
+
+			if (pos == glm::vec3(0.0f))
+				return;
+
+			Tree* t = new Tree(global_registry, "Tree_added_" + std::to_string(tree_map.size()));
+			t->set_position(pos);
+			tree_map[t->get_id()] = t;
+		},
+		&ui_shader,
+		printer
+	);
+
+	ui_manager.add_widget(addTreeButton);
+	addTreeButton->set_text_scale(2.3f);
+
+
 	info_panel = new Text_panel(
 		glm::vec2(0.5f, -0.9f),
 		glm::vec2(0.4f, 0.3f),

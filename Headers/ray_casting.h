@@ -155,4 +155,20 @@ namespace Ray_casting
         return extract_frustum(cam.projection, cam.view);
 	}
 
+    static glm::vec3 ray_plane_intersection(
+        const glm::vec3& ray_origin,
+        const glm::vec3& ray_dir,
+        float plane_y = 0.0f)
+    {
+        if (glm::abs(ray_dir.y) < 1e-6f)
+            return glm::vec3(0.0f);
+
+        float t = (plane_y - ray_origin.y) / ray_dir.y;
+
+        if (t < 0.0f)
+            return glm::vec3(0.0f);
+
+        return ray_origin + t * ray_dir;
+    }
+
 }
