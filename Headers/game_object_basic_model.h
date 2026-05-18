@@ -428,15 +428,19 @@ public:
 		/// <param name="loop_instance">[in] Instance divisor (default = 1).</param>
 		/// <returns>0 on success, -1 on failure.</returns>
 		int add_instance_buffer(int attrib_size, int attrib_index, int loop_instance = 1)
-		{			
+		{
 			if (!can_override_vbo && instance_attributes[attrib_index].VBO != 0)
+			{
+				LOG_ERROR("Game_object_basic: Instance attribute buffer is already filled and override is disabled");
 				return -1; //attribute already filled
+			}
+			int index_amount = (attrib_size / 4) + (attrib_size % 4 == 0 ? 0 : 1);
 
-			int index_amount = (attrib_size / 4) + (attrib_size%4 ==0? 0:1);
-
-			if (attrib_index + index_amount -1  >= VAO_MAX_ATTRIB_AMOUNT || attrib_index <= 2)
-				return -1; // Invalid or mesh's attribute index
-			
+			if (attrib_index + index_amount - 1 >= VAO_MAX_ATTRIB_AMOUNT || attrib_index <= 2)
+			{
+			LOG_ERROR("Game_object_basic: Invalid attribute index or index range exceeds VAO maximum attribute amount");
+			return -1; // Invalid or mesh's attribute index
+			}
 			if (can_override_vbo && instance_attributes[attrib_index].VBO != 0)
 			{
 				glDeleteBuffers(1, &instance_attributes[attrib_index].VBO);
