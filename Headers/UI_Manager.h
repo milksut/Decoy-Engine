@@ -13,11 +13,24 @@ private:
 
 public:
 
+    /// <summary>
+    ///     Adds a UI widget to the container.
+    /// </summary>
+    /// <param name="widget">[in] Pointer to the widget to add.</param>
     void add_widget(Widget* widget)
     {
         widgets.push_back(widget);
     }
 
+    /// <summary>
+    ///     Updates all visible widgets in the container.
+    /// </summary>
+    /// <remarks>
+    ///     Iterates through the widget list and forwards input state to each active widget.
+    /// </remarks>
+    /// <param name="mouse_x">[in] Mouse X position.</param>
+    /// <param name="mouse_y">[in] Mouse Y position.</param>
+    /// <param name="clicked">[in] Mouse click state.</param>
     void update(float mouse_x, float mouse_y, bool clicked)
     {
         for (Widget* widget : widgets)
@@ -27,6 +40,12 @@ public:
         }
     }
 
+    /// <summary>
+    ///     Renders all visible widgets in the container.
+    /// </summary>
+    /// <remarks>
+    ///     Iterates through the widget list and calls each widget's render function.
+    /// </remarks>
     void render()
     {
         for (Widget* widget : widgets)
@@ -36,6 +55,12 @@ public:
         }
     }
 
+    /// <summary>
+    ///     Checks whether the mouse is hovering over any visible widget.
+    /// </summary>
+    /// <param name="mouse_x">[in] Mouse X position.</param>
+    /// <param name="mouse_y">[in] Mouse Y position.</param>
+    /// <returns>True if any widget is hovered.</returns>
     bool is_hovered(float mouse_x, float mouse_y)
     {
         for (Widget* widget : widgets)

@@ -29,21 +29,41 @@ public:
     {
     }
 
+    /// <summary>
+    ///     Sets the background color of the UI element.
+    /// </summary>
+    /// <param name="color">[in] RGBA background color.</param>
     void set_background_color(glm::vec4 color)
     {
         background_color = color;
     }
 
+    /// <summary>
+    ///     Sets the scale factor used for rendering text.
+    /// </summary>
+    /// <param name="s">[in] Text scale multiplier.</param>
     void set_text_scale(float s)
     {
         text_scale = s;
     }
 
+    /// <summary>
+    ///     Sets the spacing between text lines.
+    /// </summary>
+    /// <param name="s">[in] Line spacing multiplier or offset value.</param>
     void set_line_spacing(float s)
     {
         line_spacing = s;
     }
 
+    /// <summary>
+    ///     Sets the text content of a specific line.
+    /// </summary>
+    /// <remarks>
+    ///     Automatically resizes the line container if the index is out of range.
+    /// </remarks>
+    /// <param name="index">[in] Line index to modify.</param>
+    /// <param name="text">[in] New text content for the line.</param>
     void set_line(int index, const std::string& text)
     {
         if (index >= (int)lines.size())
@@ -51,16 +71,38 @@ public:
         lines[index] = text;
     }
 
+    /// <summary>
+    ///     Clears all stored text lines.
+    /// </summary>
+    /// <remarks>
+    ///     Removes all entries from the internal line container.
+    /// </remarks>
     void clear()
     {
         lines.clear();
     }
 
+    /// <summary>
+    ///     Updates the widget state.
+    /// </summary>
+    /// <remarks>
+    ///     This implementation is static and does not process any input.
+    /// </remarks>
+    /// <param name="mouse_x">[in] Mouse X position.</param>
+    /// <param name="mouse_y">[in] Mouse Y position.</param>
+    /// <param name="clicked">[in] Mouse click state.</param>
     void update(float mouse_x, float mouse_y, bool clicked) override
     {
         // static widget, no input
     }
 
+    /// <summary>
+    ///     Renders the UI widget including background and multi-line text.
+    /// </summary>
+    /// <remarks>
+    ///     Draws a colored quad background (if enabled), then renders each text line
+    ///     with configurable spacing and scale.
+    /// </remarks>
     void render() override
     {
         if (!visible) return;

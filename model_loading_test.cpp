@@ -26,7 +26,7 @@ Event_manager manager;
 Input_Manager* my_input_manager;
 
 //-*-*-*-*-*-*-*-**-*-*-*-*-**-*-*-*-*-*-*-*-*-*-*-*-*-*-*-**-*-*-*-*-*-*-*-*
-int grid_amount = 100;
+int grid_amount = 60;
 //-*-*-*-*-*-*-*-**-*-*-*-*-**-*-*-*-*-*-*-*-*-*-*-*-*-*-*-**-*-*-*-*-*-*-*-*
 
 class Tree : public game_object_basic<Tree> {
@@ -245,7 +245,7 @@ int main()
 
 	Button* addTreeButton = new Button(
 		glm::vec2(-0.95f, 0.5f),
-		glm::vec2(0.8f, 0.4f),
+		glm::vec2(0.3f, 0.2f),
 		"Ekle",
 		[]()
 		{
@@ -276,7 +276,8 @@ int main()
 
 	ui_manager.add_widget(addTreeButton);
 	addTreeButton->set_text_scale(2.3f);
-
+	addTreeButton->set_color({ 0.0f, 5.6f, 0.2f, 1.0f });
+	addTreeButton->set_text_scale(2.3f);
 
 	info_panel = new Text_panel(
 		glm::vec2(0.5f, -0.9f),
@@ -284,11 +285,10 @@ int main()
 		&ui_shader,
 		printer
 	);
-	info_panel->set_background_color({ 0.1f, 0.1f, 0.1f, 0.8f });
 	info_panel->visible = false;
 	ui_manager.add_widget(info_panel);
 
-	info_panel->set_background_color({ 0.15f, 0.15f, 0.65f, 0.9f });
+	info_panel->set_background_color({ 0.15f, 0.15f, 0.15f, 0.9f });
 	info_panel->set_text_scale(0.75f);
 	info_panel->set_line_spacing(0.08f);
 
