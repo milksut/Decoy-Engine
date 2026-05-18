@@ -35,12 +35,19 @@ private:
 	static int get_ascii_code(const std::string& str)
 	{
 		size_t start = str.find(' '); // find first space
-		if (start == std::string::npos) return -1; // no space found
+		if (start == std::string::npos)
+		{
+			LOG_ERROR("StringParser: No space character found in input string");
+			return -1; // no space found
+		}
 		start++; // move past first space
 
 		size_t fin = str.find(' ', start); // find next space after start
-		if (fin == std::string::npos) return -1; // no second space found
-
+		if (fin == std::string::npos)
+		{
+			LOG_ERROR("StringParser: Second space not found after start position");
+			return -1; // no second space found
+		}
 		return std::stoi(str.substr(start, fin - start));
 	}
 
@@ -154,7 +161,10 @@ public:
 	int change_deleted_colors(int index_of_color, const glm::vec4& new_deleted_color, float tolerance = 0.5f, const glm::vec4& new_replace_color = glm::vec4(1.0f, 1.0f, 1.0f, 0.0f))
 	{
 		if (index_of_color < 0 || index_of_color > 7)
+		{
+			LOG_ERROR("ColorManager: Invalid color index. Must be in range [0, 7]");
 			return -1;
+		}
 		if (index_of_color >= num_color)
 			index_of_color = num_color++;
 

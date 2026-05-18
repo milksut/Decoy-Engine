@@ -501,6 +501,7 @@ namespace Texture_slots {
 				return i;
 			}
 		}
+		LOG_ERROR("TextureManager: Texture ID not found in bound slots");
 		return -1;
 	}
 
@@ -515,6 +516,7 @@ namespace Texture_slots {
 				return i;
 			}
 		}
+		LOG_ERROR("TextureManager: No empty texture slot available");
 		return -1;
 	}
 
@@ -604,6 +606,7 @@ namespace Ubo_slots
 				return i;
 			}
 		}
+		LOG_ERROR("UniformBuffer: No empty UBO binding slot available");
 		return -1;
 	}
 
@@ -619,6 +622,7 @@ namespace Ubo_slots
 				return i;
 			}
 		}
+		LOG_ERROR("UniformBuffer: UBO ID not found in bound slots");
 		return -1;
 	}
 
@@ -818,6 +822,7 @@ namespace Material_slots
 				return i;
 			}
 		}
+		LOG_ERROR("MaterialSystem: No empty material slot available");
 		return -1;
 	}
 
@@ -859,11 +864,16 @@ namespace Material_slots
 	/// </returns>
 	int material_wrapper_index(unsigned int material_id)
 	{
-		if(materials.empty())
+		if (materials.empty())
+		{
+			LOG_ERROR("MaterialSystem: Material list is empty");
 			return -1;
-		if(material_id <=0)
+		}
+		if (material_id <= 0)
+		{
+			LOG_ERROR("MaterialSystem: Invalid material ID (<= 0)");
 			return -1;
-
+		}
 		if(materials[material_id-1].material_id == material_id)
 			return material_id-1;
 
@@ -876,6 +886,7 @@ namespace Material_slots
 				return i;
 			}
 		}
+		LOG_ERROR("MaterialSystem: Material ID %d not found in wrapper list", material_id);
 		return -1;
 	}
 
@@ -985,6 +996,7 @@ namespace Material_slots
 				return i;
 			}
 		}
+		LOG_ERROR("MaterialSystem: Material ID %d not found in bound slots", material_id);
 		return -1;
 	}
 

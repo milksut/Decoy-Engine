@@ -64,7 +64,10 @@ namespace Ray_casting
         float discriminant = b * b - 4.0f * c;
 
         if (discriminant < 0.0f)
+        { 
+            //LOG_ERROR("RayCasting: Ray-sphere intersection failed. No real intersection (discriminant < 0)");
             return -1.0f;
+        }
 
         float sqrt_d = sqrt(discriminant);
 
@@ -74,6 +77,7 @@ namespace Ray_casting
         if (t1 > 0.0f) return t1;
         if (t2 > 0.0f) return t2;
 
+        LOG_ERROR("RayCasting: No ray-sphere intersection. Discriminant < 0 (no real roots)");
         return -1.0f;
     }
 
