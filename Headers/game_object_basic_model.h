@@ -204,17 +204,17 @@ public:
 			// vertex positions
 			glEnableVertexAttribArray(0);
 			glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(vertex_data), (void*)nullptr);
-			instance_attributes[0] = { VBO_Mesh,0,0,3,0 };
+			instance_attributes[0] = { VBO_Mesh,0,0,3* sizeof(float),0 };
 
 			// vertex texture coords
 			glEnableVertexAttribArray(1);
 			glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(vertex_data), (void*)offsetof(vertex_data, tex_coords));
-			instance_attributes[1] = { VBO_Mesh,1,1,2,0 };
+			instance_attributes[1] = { VBO_Mesh,1,1,2* sizeof(float),0 };
 
 			// vertex  normals
 			glEnableVertexAttribArray(2);
 			glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, sizeof(vertex_data), (void*)offsetof(vertex_data, normal));
-			instance_attributes[2] = { VBO_Mesh,2,2,3,0 };
+			instance_attributes[2] = { VBO_Mesh,2,2,3* sizeof(float),0 };
 			glBindVertexArray(0);
 		}
 
@@ -331,6 +331,9 @@ public:
 			//resize VBOS and re upload data
 			for(attribute &attrib : instance_attributes)
 			{
+				if (attrib.attrib_start_index <= 2)
+					continue;
+
 				override_instance_buffer(attrib.attrib_size_bytes / sizeof(float), attrib.attrib_start_index, attrib.loop_instance);
 
 				if(attrib.VBO != 0)
@@ -372,6 +375,9 @@ public:
 			//resize VBOS and re upload data
 			for (attribute& attrib : instance_attributes)
 			{
+				if (attrib.attrib_start_index <= 2)
+					continue;
+
 				override_instance_buffer(attrib.attrib_size_bytes / sizeof(float), attrib.attrib_start_index, attrib.loop_instance);
 
 				if (attrib.VBO != 0)
@@ -431,15 +437,15 @@ public:
 		{
 			if (!can_override_vbo && instance_attributes[attrib_index].VBO != 0)
 			{
-				LOG_ERROR("Game_object_basic: Instance attribute buffer is already filled and override is disabled");
+				LOG_ERROR("Game_object_basic_model: Instance attribute buffer is already filled and override is disabled");
 				return -1; //attribute already filled
 			}
 			int index_amount = (attrib_size / 4) + (attrib_size % 4 == 0 ? 0 : 1);
 
 			if (attrib_index + index_amount - 1 >= VAO_MAX_ATTRIB_AMOUNT || attrib_index <= 2)
 			{
-			LOG_ERROR("Game_object_basic: Invalid attribute index or index range exceeds VAO maximum attribute amount");
-			return -1; // Invalid or mesh's attribute index
+				LOG_ERROR("Game_object_basic_model: Invalid attribute index or index range exceeds VAO maximum attribute amount");
+				return -1; // Invalid or mesh's attribute index
 			}
 			if (can_override_vbo && instance_attributes[attrib_index].VBO != 0)
 			{

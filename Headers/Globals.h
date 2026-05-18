@@ -996,7 +996,7 @@ namespace Material_slots
 				return i;
 			}
 		}
-		LOG_ERROR("MaterialSystem: Material ID %d not found in bound slots", material_id);
+		LOG_WARNING("MaterialSystem: Material ID %d not found in bound slots", material_id);
 		return -1;
 	}
 
