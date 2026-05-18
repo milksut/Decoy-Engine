@@ -306,6 +306,12 @@ private:
 		return registry.get<Transform_component>(this_object);
 	}
 
+	//TODO:add param
+	World_AABB_component* get_world_aabb_ref() const
+	{
+		return registry.try_get<World_AABB_component>(this_object);
+	}
+
 	/// <summary>
 	///     Converts a raw region pointer back into a game object pointer.
 	/// </summary>
@@ -445,6 +451,17 @@ protected:
 
 			is_pos_changed_flag = false;
 
+			World_AABB_component* aabb = get_world_aabb_ref();
+			if (aabb)
+			{
+				aabb->aabb = game_object_basic_model::get_world_aabb(model->model_aabb, get_transform_ref().world);
+			}
+			else if(model)
+			{
+				registry.emplace<World_AABB_component>(this_object,
+					game_object_basic_model::get_world_aabb(model->model_aabb, get_transform_ref().world));
+			}
+
 		}
 
 		Child_component* childs = registry.try_get<Child_component>(this_object);
@@ -582,6 +599,16 @@ public:
 	Transform_component get_transform_copy() const
 	{
 		return get_transform_ref();
+	}
+
+	//TODO:add param
+	World_AABB_component get_world_aabb_copy() const
+	{
+		World_AABB_component* aabb = get_world_aabb_ref();
+		if (aabb)
+			return *aabb;
+		else
+			return World_AABB_component();
 	}
 
 	/// <summary>
@@ -772,6 +799,7 @@ public:
 			region->object_ptrs.assign(region_size, nullptr);
 			transform_attrib_index = transform_attrib_index_in;
 			transpose_inverse_transform_attrib_index = tranpose_inverse_transform_attrib_index_in;
+
 		}
 		else
 		{
@@ -805,18 +833,6 @@ public:
 			
 		model->reserve_additional_region(additional_size + region->size_in_number, region);
 		return additional_size + region->size_in_number;
-	}
-
-	//TODO: turn this into a entt comp and update when transform changes
-	AABB get_world_aabb()
-	{
-		if (model == nullptr)
-		{
-			LOG_WARNING("Game_object_basic: cant get aabb, there is no defined model!");
-			return AABB();
-		}
-
-		return game_object_basic_model::Mesh::get_world_aabb(model->Meshes[0]->bounding_box, get_transform_ref().world);
 	}
 
 	//--- draw -----------------------------------------------------------------------------------

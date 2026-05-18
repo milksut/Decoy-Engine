@@ -148,64 +148,6 @@ public:
 
 
 public:
-		static AABB calculate_aabb(const std::vector<glm::vec3>& vertices)
-		{
-			glm::vec3 min(FLT_MAX);
-			glm::vec3 max(-FLT_MAX);
-
-			for (const auto& v : vertices)
-			{
-				min.x = std::min(min.x, v.x);
-				min.y = std::min(min.y, v.y);
-				min.z = std::min(min.z, v.z);
-
-				max.x = std::max(max.x, v.x);
-				max.y = std::max(max.y, v.y);
-				max.z = std::max(max.z, v.z);
-			}
-			return { min, max };
-		}
-
-		static AABB calculate_aabb(const std::vector<vertex_data>& vertices)
-		{
-			glm::vec3 min(FLT_MAX);
-			glm::vec3 max(-FLT_MAX);
-			for (const auto& v : vertices)
-			{
-				min.x = std::min(min.x, v.position[0]);
-				min.y = std::min(min.y, v.position[1]);
-				min.z = std::min(min.z, v.position[2]);
-				max.x = std::max(max.x, v.position[0]);
-				max.y = std::max(max.y, v.position[1]);
-				max.z = std::max(max.z, v.position[2]);
-			}
-			return { min, max };
-		}
-
-		static AABB get_world_aabb(const AABB& local, const glm::mat4& model)
-		{
-			glm::vec3 corners[8] = {
-				{local.min.x, local.min.y, local.min.z},
-				{local.max.x, local.min.y, local.min.z},
-				{local.min.x, local.max.y, local.min.z},
-				{local.max.x, local.max.y, local.min.z},
-				{local.min.x, local.min.y, local.max.z},
-				{local.max.x, local.min.y, local.max.z},
-				{local.min.x, local.max.y, local.max.z},
-				{local.max.x, local.max.y, local.max.z},
-			};
-
-			AABB world;
-			world.min = glm::vec3(FLT_MAX);
-			world.max = glm::vec3(-FLT_MAX);
-
-			for (auto& c : corners) {
-				glm::vec3 wc = glm::vec3(model * glm::vec4(c, 1.0f));
-				world.min = glm::min(world.min, wc);
-				world.max = glm::max(world.max, wc);
-			}
-			return world;
-		}
 
 		std::vector<vertex_data>  main_vertices;
 		std::vector<unsigned int> main_indices;
@@ -842,6 +784,79 @@ public:
 
 	std::vector<Mesh_Childs> roots;
 
+	AABB model_aabb = {};
+
+	void update_model_aabb()
+	{
+		if (Meshes.empty())
+			return;
+		model_aabb = Meshes[0]->bounding_box;
+		for (const std::shared_ptr<Mesh>& mesh : Meshes)
+		{
+			model_aabb.min = glm::min(model_aabb.min, mesh->bounding_box.min);
+			model_aabb.max = glm::max(model_aabb.max, mesh->bounding_box.max);
+		}
+	}
+
+	static AABB calculate_aabb(const std::vector<glm::vec3>& vertices)
+	{
+		glm::vec3 min(FLT_MAX);
+		glm::vec3 max(-FLT_MAX);
+
+		for (const auto& v : vertices)
+		{
+			min.x = std::min(min.x, v.x);
+			min.y = std::min(min.y, v.y);
+			min.z = std::min(min.z, v.z);
+
+			max.x = std::max(max.x, v.x);
+			max.y = std::max(max.y, v.y);
+			max.z = std::max(max.z, v.z);
+		}
+		return { min, max };
+	}
+
+	static AABB calculate_aabb(const std::vector<vertex_data>& vertices)
+	{
+		glm::vec3 min(FLT_MAX);
+		glm::vec3 max(-FLT_MAX);
+		for (const auto& v : vertices)
+		{
+			min.x = std::min(min.x, v.position[0]);
+			min.y = std::min(min.y, v.position[1]);
+			min.z = std::min(min.z, v.position[2]);
+			max.x = std::max(max.x, v.position[0]);
+			max.y = std::max(max.y, v.position[1]);
+			max.z = std::max(max.z, v.position[2]);
+		}
+		return { min, max };
+	}
+
+	static AABB get_world_aabb(const AABB& local, const glm::mat4& model)
+	{
+		glm::vec3 corners[8] = {
+			{local.min.x, local.min.y, local.min.z},
+			{local.max.x, local.min.y, local.min.z},
+			{local.min.x, local.max.y, local.min.z},
+			{local.max.x, local.max.y, local.min.z},
+			{local.min.x, local.min.y, local.max.z},
+			{local.max.x, local.min.y, local.max.z},
+			{local.min.x, local.max.y, local.max.z},
+			{local.max.x, local.max.y, local.max.z},
+		};
+
+		AABB world;
+		world.min = glm::vec3(FLT_MAX);
+		world.max = glm::vec3(-FLT_MAX);
+
+		for (auto& c : corners) {
+			glm::vec3 wc = glm::vec3(model * glm::vec4(c, 1.0f));
+			world.min = glm::min(world.min, wc);
+			world.max = glm::max(world.max, wc);
+		}
+		return world;
+	}
+
 	/// <summary>
 	///     Creates a new mesh and adds it to the mesh collection.
 	/// </summary>
@@ -851,6 +866,7 @@ public:
 	void add_mesh(const std::vector<vertex_data>& vertices,const std::vector<unsigned int>& indices,const std::vector<Texture>& textures)
 	{
 		Meshes.push_back(std::make_shared<Mesh>(vertices, indices, textures));
+		update_model_aabb();
 	}
 
 	/// <summary>
@@ -976,6 +992,7 @@ public:
 			roots.push_back(std::move(new_root));
 			return (int)roots.size() - 1;
 		}
+		update_model_aabb();
 
 	}
 
@@ -1018,6 +1035,11 @@ public:
 		}
 
 		Meshes[mesh_index]->update_mesh(vertices, update_aabb);
+
+		if(update_aabb)
+		{
+			update_model_aabb();
+		}
 	}
 
 	//unneded? maybe just use a for loop?
@@ -1050,6 +1072,11 @@ public:
 		{
 			offset_mesh_vertices(i, transform, update_aabb);
 		}
+
+		if (update_aabb)
+		{
+			update_model_aabb();
+		}
 	}
 
 	/// <summary>
@@ -1063,6 +1090,11 @@ public:
 	void offset_mesh_vertices(const glm::mat4 transform, bool update_aabb = true)
 	{
 		offset_mesh_vertices((unsigned int)0, (unsigned int)Meshes.size() - 1, transform, update_aabb);
+
+		if (update_aabb)
+		{
+			update_model_aabb();
+		}
 	}
 
 };

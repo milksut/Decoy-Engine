@@ -473,10 +473,10 @@ int main()
 		visible_list.reserve(region_size * 10);
 		available_indices.reserve(region_size);
 
-		auto view = global_registry.view<Transform_component, Id_component, Tag_component >();
+		auto view = global_registry.view<Transform_component, Id_component, Tag_component, World_AABB_component>();
 
 		view.each([&visible_list, &frustum](auto /*entity*/, Transform_component& /*transform*/,
-			Id_component& id_comp, Tag_component& tag_comp)
+			Id_component& id_comp, Tag_component& tag_comp, World_AABB_component& aabb_comp)
 			{
 
 				if (tag_comp.tag.find("Tree") == std::string::npos)
@@ -484,15 +484,13 @@ int main()
 					return; //only check entities with "Tree" in their tag
 				}
 
-				if (Ray_casting::aabb_in_frustum(frustum, static_cast<game_object_basic<Tree>*>(Global_object_map::get_object(id_comp.id))->get_world_aabb()))
+				if (Ray_casting::aabb_in_frustum(frustum, aabb_comp.aabb))
 				{
 					visible_list.push_back(id_comp.id);
 				}
 			});
 
 		const unsigned int visible_amount = (unsigned int)visible_list.size();
-
-
 
 		for (unsigned int i = 0; i < visible_amount && i < region_size; i++)
 		{

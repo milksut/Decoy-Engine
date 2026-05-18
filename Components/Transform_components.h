@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Globals.h"
 #include <glm/glm.hpp>
 
 struct Transform_component 
@@ -11,4 +12,9 @@ struct Transform_component
     
     //the position on the world, affected by parent
     glm::mat4 world = glm::mat4(1.0);
+};
+
+struct World_AABB_component
+{
+    AABB aabb = AABB();
 };
