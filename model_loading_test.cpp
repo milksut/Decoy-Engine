@@ -1,15 +1,12 @@
 #include "Camera_test.h"
-#include "game_object_basic_model.h"
+#include "game_object_basic.h"
 #include "Globals.h"
 #include "Shader.h"
 #include "Some_functions.h"
 #include "TextRenderer.h"
-
-#include "Input_Manager.h"
-#include "The_event_manager.h"
-#include "Headers/game_object_basic.h"
-#include "Headers/ray_casting.h"
+#include "ray_casting.h"
 #include "UI_Manager.h"
+#include "Window_manager.h"
 
 bool camera_control = false;
 
@@ -17,16 +14,13 @@ const double Target_fps = 144;
 const double Target_frame_time = 1.0 / Target_fps;
 const bool enable_vSync = false;
 
-unsigned int screen_width = 800, screen_height = 600;
-const float aspect_ratio = (float)screen_width / (float)screen_height;
-
 game_object_basic_model backpack;
 
 Event_manager manager;
 Input_Manager* my_input_manager;
 
 //-*-*-*-*-*-*-*-**-*-*-*-*-**-*-*-*-*-*-*-*-*-*-*-*-*-*-*-**-*-*-*-*-*-*-*-*
-int grid_amount = 60;
+int grid_amount = 100;
 //-*-*-*-*-*-*-*-**-*-*-*-*-**-*-*-*-*-*-*-*-*-*-*-*-*-*-*-**-*-*-*-*-*-*-*-*
 
 class Tree : public game_object_basic<Tree> {
@@ -53,19 +47,6 @@ Text_panel* info_panel = nullptr;
 TextRenderer* printer;
 camera_test* fps_camera;
 UI_manager ui_manager;
-
-void framebuffer_size_callback(GLFWwindow* /*window*/, int width, int height)
-{
-	const float new_aspect_ratio = (float)width / (float)height;
-
-	glViewport(0, 0, width, height);
-
-	fps_camera->update_projection(45.0f, new_aspect_ratio, 0.1f, 500.0f);
-	printer->change_screen_size(width, height);
-
-	screen_width = width;
-	screen_height = height;
-}
 
 bool pressable = true;
 void processInput(GLFWwindow* window, float camera_speed, camera_test* camera)
@@ -160,21 +141,19 @@ void processInput(GLFWwindow* window, float camera_speed, camera_test* camera)
 
 int main()
 {
-	glfwInit();
-	GLFWwindow* window = init_window(screen_width, screen_height, "Shader Tester");
-	glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
+	Window_Manager my_window_manager(manager);
+	my_input_manager = my_window_manager.get_input_manager();
+	Window_Manager::Config config_ref = my_window_manager.get_config_ref();
 
-	if (!window) {
-		return -1;
-	}
+	glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
 
 	glfwSwapInterval(enable_vSync);
 	fps_camera = new camera_test(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(270.0f, 0.0f, 0.0f));
-	fps_camera->update_projection(45.0f, aspect_ratio, 0.1f, 500.0f);
+	fps_camera->update_projection(45.0f, config_ref.aspect_ratio, 0.1f, 500.0f);
 
 	printer = new TextRenderer("Textures/Font_texture_Atlas/DejaVu Sans Mono_512X256_16x32.png",
 		"Textures/Font_texture_Atlas/DejaVu Sans Mono_512X256_16x32.txt",
-		screen_width, screen_height, 16, 32,
+		config_ref.width, config_ref.height, 16, 32,
 		"Shaders/Vertex_shaders/Text_render_vertex.vert",
 		"Shaders/Fragment_shaders/Text_render_fragment.frag",
 		"Shaders/Geometry_shaders/Text_render_geometry.geom",
@@ -184,8 +163,6 @@ int main()
 	printer->change_deleted_colors(1, glm::vec4(1.0f, 1.0f, 1.0f, 1.0f), 1.5f, glm::vec4(1.0f, 0.0f, 0.0f, 1.0f));
 	printer->push_deleted_colors();
 
-
-	glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
 
 	Shader shader("Shaders/Vertex_shaders/Loaded_model_vertex.vert",
 		"Shaders/Fragment_shaders/Loaded_model_fragment.frag");
@@ -247,12 +224,12 @@ int main()
 		glm::vec2(-0.95f, 0.5f),
 		glm::vec2(0.3f, 0.2f),
 		"Ekle",
-		[]()
+		[&config_ref]()
 		{
 			glm::vec3 ray_dir = Ray_casting::ScreenToWorldRay(
-				(float)screen_width / 2.0f,
-				(float)screen_height / 2.0f,
-				screen_width, screen_height,
+				(float)config_ref.width / 2.0f,
+				(float)config_ref.height / 2.0f,
+				config_ref.width, config_ref.height,
 				fps_camera->projection,
 				fps_camera->view
 			);
@@ -363,17 +340,16 @@ int main()
 	pointer_arrow.set_position({ 0.0f, 4.5f, 0.0f });
 
 	//-------------------------------------------------------------------------------------------------------------
-	my_input_manager = new Input_Manager(manager,window);
 
-	Event_management::Event_receiver_shared click_receiver =Event_management::make_receiver([&pointer_arrow](const Event_management::Event& e)
+	Event_management::Event_receiver_shared click_receiver =Event_management::make_receiver([&pointer_arrow, &config_ref](const Event_management::Event& e)
 		{
 			if (e.type == Event_management::Event_type::Mouse_button_pressed)
 			{
 				const auto& mouse = dynamic_cast<const Mouse_button_press_event&>(e);
 
 				if (mouse.key.code != GLFW_MOUSE_BUTTON_LEFT) return;
-				float mx = (float)(mouse.mouse_x / screen_width) * 2.0f - 1.0f;
-				float my = 1.0f - (float)(mouse.mouse_y / screen_height) * 2.0f;
+				float mx = (float)(mouse.mouse_x / config_ref.width) * 2.0f - 1.0f;
+				float my = 1.0f - (float)(mouse.mouse_y / config_ref.height) * 2.0f;
 
 				if (ui_manager.is_hovered(mx, my))
 					return;
@@ -388,7 +364,7 @@ int main()
 						return; //only check entities with "Tree" in their tag
 
 					glm::vec3 rayDir = Ray_casting::ScreenToWorldRay((float)mouse.mouse_x, (float)mouse.mouse_y,
-						screen_width, screen_height, fps_camera->projection, fps_camera->view);
+						config_ref.width, config_ref.height, fps_camera->projection, fps_camera->view);
 
 					float dist = Ray_casting::ray_sphere_intersection(fps_camera->camera_position, rayDir,
 						glm::vec3(transform.position), 3.0f);
@@ -424,10 +400,10 @@ int main()
 			}
 		});
 
-	my_input_manager->subscribe(Mouse_input, Event_management::Event_type::Mouse_button_pressed, click_receiver);
+	my_input_manager->subscribe(Input_channel_names[Mouse_input], Event_management::Event_type::Mouse_button_pressed, click_receiver);
 
 	Event_management::Event_receiver_shared camera_trigger = Event_management::make_receiver([](const Event_management::Event& e)
-	{
+		{
 			if (e.type == Event_management::Event_type::Mouse_moved)
 			{
 				const auto& mouse = dynamic_cast<const Mouse_move_event&>(e);
@@ -441,14 +417,39 @@ int main()
 					);
 				}
 			}
-	});
+		});
 
-	my_input_manager->subscribe(Mouse_input, Event_management::Event_type::Mouse_moved, camera_trigger);
+	my_input_manager->subscribe(Input_channel_names[Mouse_input], Event_management::Event_type::Mouse_moved, camera_trigger);
+
+	bool window_should_close = false;
+
+	Event_management::Event_receiver_shared window_close_reciver = Event_management::make_receiver([&window_should_close](const Event_management::Event& e)
+		{
+			if(e.type == Event_management::Event_type::Window_closed)
+			{
+				window_should_close = true;
+			}
+		});
+
+	my_window_manager.subscribe(Event_management::Event_type::Window_closed, window_close_reciver);
+
+	Event_management::Event_receiver_shared framebuffer_chnage_reciver = Event_management::make_receiver([](const Event_management::Event& e)
+		{
+			if (e.type == Event_management::Event_type::Window_framebuffer_resized)
+			{
+				const auto& resize = static_cast<const Window_framebuffer_resize_event&>(e);
+
+				fps_camera->update_projection(45.0f, resize.new_aspect_ratio, 0.1f, 500.0f);
+				printer->change_screen_size(resize.new_width, resize.new_height);
+			}
+			
+		});
+
+	my_window_manager.subscribe(Event_management::Event_type::Window_framebuffer_resized, framebuffer_chnage_reciver);
 
 	glEnable(GL_DEPTH_TEST); // Enable depth testing for 3D rendering
 	glEnable(GL_CULL_FACE); // Enable face culling to improve performance
 	//glCullFace(GL_FRONT_AND_BACK);
-	glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
 	int x = 0, y = 0;
 	double time_of_last_frame = 1.0, z = 0;
 	std::string fps_text = "";
@@ -457,7 +458,7 @@ int main()
 
 	shader.bind_UBO("projectionXview_block",fps_camera->Ubo_slot);
 
-	while (!glfwWindowShouldClose(window))
+	while (!window_should_close)
 	{
 
 		// Frustum culling test start --------------------------------------------------------------
@@ -468,7 +469,7 @@ int main()
 		std::vector<int> available_indices;
 
 		std::vector<void*>& region = Tree::get_class_region()->object_ptrs;
-		unsigned int region_size = region.size();
+		unsigned int region_size = (unsigned int)region.size();
 
 		visible_list.reserve(region_size * 10);
 		available_indices.reserve(region_size);
@@ -542,22 +543,27 @@ int main()
 				static_cast<game_object_base*>(obj_ptr)->swap_region_pos(id);
 			}
 		}
-
 		// Frustum culling test end -----------------------------------------------------------------
 
+		Tree::max_region_upload_index = visible_amount;
 		game_object_base::Tick(global_registry);
-		camera_control = glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_RIGHT) == GLFW_PRESS;
 
-		bool mouse_clicked = glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS;
+		Key_state state_holder_temp = my_input_manager->Get_key_state({ Mouse_input,GLFW_MOUSE_BUTTON_RIGHT });
+
+		camera_control = state_holder_temp == Pressed || state_holder_temp == Hold;
+
+		state_holder_temp = my_input_manager->Get_key_state({ Mouse_input,GLFW_MOUSE_BUTTON_LEFT });
+
+		bool mouse_clicked = state_holder_temp == Pressed || state_holder_temp == Hold;
 
 		//mouse position in NDC for UI interactions
 		double mouse_xd, mouse_yd;
-		glfwGetCursorPos(window, &mouse_xd, &mouse_yd);
+		my_window_manager.get_mouse_position(mouse_xd, mouse_yd);
 
-		float mouse_ndc_x = (float)(mouse_xd / screen_width) * 2.0f - 1.0f;
-		float mouse_ndc_y = 1.0f - (float)(mouse_yd / screen_height) * 2.0f;
+		float mouse_ndc_x = (float)(mouse_xd / config_ref.width) * 2.0f - 1.0f;
+		float mouse_ndc_y = 1.0f - (float)(mouse_yd / config_ref.height) * 2.0f;
 
-		processInput(window, 0.1f * (float)((glfwGetTime() - time_of_last_frame) / Target_frame_time), fps_camera);
+		processInput(my_window_manager.get_handle(), 0.1f * (float)((glfwGetTime() - time_of_last_frame) / Target_frame_time), fps_camera);
 		time_of_last_frame = glfwGetTime();
 
 		ui_manager.update(mouse_ndc_x, mouse_ndc_y, mouse_clicked);
@@ -581,7 +587,6 @@ int main()
 			x = 0;
 			z = glfwGetTime();
 			fps_text = "FPS: " + std::to_string(y);
-			//LOG_INFO("FPS: %d Draw calls per second: %d", y, draw_call_count);
 			draw_call_count = 0;
 			reverse_arrow_animation = !reverse_arrow_animation;
 		}
@@ -594,9 +599,8 @@ int main()
 
 		pointer_arrow.move(glm::vec3(0.0f, reverse_arrow_animation ? 0.001f : -0.001f, 0.0f));
 
-		glfwSwapBuffers(window);
 		my_input_manager->Poll_keys();
-		glfwPollEvents();
+		my_window_manager.Tick();
 	}
 	delete printer;
 }

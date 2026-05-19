@@ -28,6 +28,7 @@
 #include <stack>
 #include <queue>
 #include <unordered_map>
+#include <optional>
 
 #include <thread>
 #include <memory>
@@ -1079,8 +1080,15 @@ namespace Event_management
 		Null,
 		Mouse_moved, Mouse_scrolled,
 		Mouse_button_pressed, Mouse_button_hold, Mouse_button_released,
+
 		Keyboard_button_pressed, Keyboard_button_hold, Keyboard_button_released,
+
 		Combo_button_pressed, Combo_button_hold, Combo_button_released,
+
+		Window_resized, Window_framebuffer_resized, Window_closed, Window_opened,
+		Window_focused, Window_unfocused, Window_iconified, Window_uniconified,
+		Window_maximized, Window_restored, Window_moved, Window_content_scaled, Window_refresh,
+
 
 		LAST_EVENT_TYPE//always leave in bottom. Used to measure how many event types there are
 	};
@@ -1146,7 +1154,6 @@ namespace Event_management
 			this->type = event_type;
 		}
 
-		virtual void execute() = 0;
 		virtual ~Event() {}
 
 	};

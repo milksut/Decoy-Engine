@@ -213,7 +213,7 @@ private:
 			batch_start = -1;
 		};
 
-		for (int i = 0; i < region_size; i++)
+		for (int i = 0; i < region_size && i < max_region_upload_index; i++)
 		{
 			void* ptr = region->object_ptrs[i];
 
@@ -256,7 +256,6 @@ private:
 	entt::registry& registry;
 
 	unsigned int id = 0;
-
 	int region_slot_index = -1; // this objects slot in region->object_ptrs
 
 	/// <summary>
@@ -561,6 +560,8 @@ protected:
 	}
 
 public:
+
+	static inline int max_region_upload_index = std::numeric_limits<int>::max();// up to what point in the region we should try to upload transforms
 
 	/// <summary>
 	///     Returns the object's slot index inside its class region.

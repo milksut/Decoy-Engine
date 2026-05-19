@@ -11,7 +11,6 @@ public:
     Mouse_move_event(const float x, const float y)
         : Event(Event_management::Event_timing::Immediate, Event_management::Event_type::Mouse_moved), x(x), y(y) {}
 
-    void execute() override {} // you can leave this empty for now
 };
 
 class Key_event : public Event_management::Event
@@ -21,5 +20,4 @@ public:
     Key_event(const int key_code)
         : Event(Event_management::Event_timing::Queued, Event_management::Event_type::Key_pressed), key_code(key_code) {}
 
-    void execute() override {}
 };

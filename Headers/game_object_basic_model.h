@@ -1000,10 +1000,9 @@ public:
 			Mesh_Childs new_root;
 			process_node(scene->mRootNode, scene, new_root,path);
 			roots.push_back(std::move(new_root));
+			update_model_aabb();
 			return (int)roots.size() - 1;
 		}
-		update_model_aabb();
-
 	}
 
 	/// <summary>

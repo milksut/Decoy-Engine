@@ -1,6 +1,3 @@
-//
-// Created by altay2510tr on 3/13/26.
-//
 #pragma once
 
 #include "Globals.h"
@@ -16,33 +13,6 @@
 class Input_Manager
 {
 private:
-    /// <summary>
-    ///     Processes mouse movement input and dispatches a corresponding event.
-    /// </summary>
-    /// <param name="x_pos">[in] Current mouse x position.</param>
-    /// <param name="y_pos">[in] Current mouse y position.</param>
-    void mouse_move_callback(double x_pos, double y_pos)
-    {
-        const double mouse_x_offset = (x_pos - mouse_x) * mouse_sensitivity;
-        const double mouse_y_offset = (y_pos - mouse_y) * mouse_sensitivity;
-
-        mouse_x = x_pos;
-        mouse_y = y_pos;
-
-        event_manager.throw_event("Mouse_input", std::make_unique<Mouse_move_event>(
-            mouse_x_offset, mouse_y_offset, mouse_x, mouse_y));
-    }
-
-    /// <summary>
-    ///     Processes mouse scroll input and dispatches a corresponding event.
-    /// </summary>
-    /// <param name="x_offset">[in] Scroll offset on the x-axis.</param>
-    /// <param name="y_offset">[in] Scroll offset on the y-axis.</param>
-    void mouse_scroll_callback(double x_offset, double y_offset)
-    {
-        event_manager.throw_event("Mouse_input",
-            std::make_unique<Mouse_scroll_event>(x_offset, y_offset, mouse_x, mouse_y));
-    }
     
     //Separate pressed state arrays for keys and mouse buttons
     Key_state Keyboard_buttons[GLFW_KEY_LAST + 1] = { Idle };
@@ -50,40 +20,35 @@ private:
 
     std::vector<std::pair<Key_combo, Key_state>> registered_combos;
     Event_manager& event_manager;
+	GLFWwindow* window = nullptr;
 
 public:
 
     double mouse_x = 0, mouse_y = 0, mouse_sensitivity = 1;  
-    GLFWwindow* window;
 
+    //TODO:fix params
     /// <summary>
     ///     Initializes the input manager, sets up event channels and registers GLFW input callbacks. Width and height only used for starting mouse position.
     /// </summary>
     /// <param name="event_manager">[in] Reference to the event manager used for input events.</param>
     /// <param name="window">[in] Pointer to the GLFW window used for input callbacks.</param>
-    Input_Manager(Event_manager& event_manager_in, GLFWwindow* the_window)
-        : event_manager(event_manager_in), window(the_window)
+    Input_Manager(Event_manager& event_manager_in, GLFWwindow* window_in)
+        : event_manager(event_manager_in), window(window_in)
     {
+        
+        //TODO: decide what to do if window chcek fails
+        //Checking if window crated using a window manager class
+        void* ptr = glfwGetWindowUserPointer(window);
+
+        if (!ptr)
+        {
+			LOG_ERROR("Input_Manager - No user pointer found for window, ensure the window was created using Window_Manager.");
+        }
+
         for(int i=0; i< Input_channel_amount; i++)
         {
             event_manager.create_channel(Input_channel_names[i]);
 		}
-
-		glfwGetCursorPos(window, &mouse_x, &mouse_y);
-
-        //TODO: when Window class is ready, use window class as user pointer and use input manger from there
-        glfwSetWindowUserPointer(window, this);
-        glfwSetCursorPosCallback(window, [](GLFWwindow* window_in, double x_pos_in, double y_pos_in)
-        {
-            const auto self = static_cast<Input_Manager*>(glfwGetWindowUserPointer(window_in));
-            self->mouse_move_callback(x_pos_in, y_pos_in);
-        });
-
-        glfwSetScrollCallback(window, [](GLFWwindow* window_in, double x_offset_in, double y_offset_in)
-        {
-            const auto self = static_cast<Input_Manager*>(glfwGetWindowUserPointer(window_in));
-            self->mouse_scroll_callback(x_offset_in, y_offset_in);
-        });
     }
 
     /// <summary>
@@ -215,14 +180,28 @@ public:
         }
     }
 
+
+    //TODO: fix param
     /// <summary>
     ///     Subscribes a receiver to a specific input channel and event type.
     /// </summary>
     /// <param name="channel">[in] Input channel to subscribe to.</param>
     /// <param name="event_type">[in] Type of event to listen for.</param>
     /// <param name="receiver">[in] Event receiver to be notified.</param>
-    void subscribe(Input_channel channel, const Event_management::Event_type event_type, const Event_management::Event_receiver_shared& receiver)
+    void subscribe(std::string channel_name, const Event_management::Event_type event_type, const Event_management::Event_receiver_shared& receiver)
     {
-		event_manager.subscribe(Input_channel_names[channel], event_type, receiver);
+		event_manager.subscribe(channel_name, event_type, receiver);
     }
+
+    //TODO: add param
+    void throw_event(std::string channel_name, std::unique_ptr<Event_management::Event> event)
+    {
+        event_manager.throw_event(channel_name, std::move(event));
+	}
+
+    //TODO: add param
+    void create_channel(std::string channel_name)
+    {
+        event_manager.create_channel(channel_name);
+	}
 };
