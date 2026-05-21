@@ -144,6 +144,7 @@ int main()
 	Window_Manager my_window_manager(manager);
 	my_input_manager = my_window_manager.get_input_manager();
 	Window_Manager::Config config_ref = my_window_manager.get_config_ref();
+	ui_manager.init(my_input_manager, config_ref.width, config_ref.height);
 
 	glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
 
@@ -348,10 +349,8 @@ int main()
 				const auto& mouse = dynamic_cast<const Mouse_button_press_event&>(e);
 
 				if (mouse.key.code != GLFW_MOUSE_BUTTON_LEFT) return;
-				float mx = (float)(mouse.mouse_x / config_ref.width) * 2.0f - 1.0f;
-				float my = 1.0f - (float)(mouse.mouse_y / config_ref.height) * 2.0f;
 
-				if (ui_manager.is_hovered(mx, my))
+				if (ui_manager.is_hovered_ndc())
 					return;
 
 				entt::entity closest_entity = entt::null;
@@ -552,21 +551,13 @@ int main()
 
 		camera_control = state_holder_temp == Pressed || state_holder_temp == Hold;
 
-		state_holder_temp = my_input_manager->Get_key_state({ Mouse_input,GLFW_MOUSE_BUTTON_LEFT });
 
-		bool mouse_clicked = state_holder_temp == Pressed || state_holder_temp == Hold;
 
-		//mouse position in NDC for UI interactions
-		double mouse_xd, mouse_yd;
-		my_window_manager.get_mouse_position(mouse_xd, mouse_yd);
-
-		float mouse_ndc_x = (float)(mouse_xd / config_ref.width) * 2.0f - 1.0f;
-		float mouse_ndc_y = 1.0f - (float)(mouse_yd / config_ref.height) * 2.0f;
 
 		processInput(my_window_manager.get_handle(), 0.1f * (float)((glfwGetTime() - time_of_last_frame) / Target_frame_time), fps_camera);
 		time_of_last_frame = glfwGetTime();
 
-		ui_manager.update(mouse_ndc_x, mouse_ndc_y, mouse_clicked);
+		ui_manager.update();
 
 		glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
