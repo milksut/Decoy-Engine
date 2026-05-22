@@ -144,7 +144,10 @@ int main()
 	Window_Manager my_window_manager(manager);
 	my_input_manager = my_window_manager.get_input_manager();
 	Window_Manager::Config config_ref = my_window_manager.get_config_ref();
-	ui_manager.init(my_input_manager, config_ref.width, config_ref.height);
+	UI_manager::Config ui_config;
+	ui_config.screen_width = config_ref.width;
+	ui_config.screen_height = config_ref.height;
+	ui_manager.init(my_input_manager, ui_config);
 
 	glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
 
@@ -225,12 +228,13 @@ int main()
 		glm::vec2(-0.95f, 0.5f),
 		glm::vec2(0.3f, 0.2f),
 		"Ekle",
-		[&config_ref]()
+		[&my_window_manager]()
 		{
+			auto& cfg = my_window_manager.get_config_ref();
 			glm::vec3 ray_dir = Ray_casting::ScreenToWorldRay(
-				(float)config_ref.width / 2.0f,
-				(float)config_ref.height / 2.0f,
-				config_ref.width, config_ref.height,
+				(float)cfg.width / 2.0f,
+				(float)cfg.height / 2.0f,
+				cfg.width, cfg.height,
 				fps_camera->projection,
 				fps_camera->view
 			);
@@ -342,7 +346,7 @@ int main()
 
 	//-------------------------------------------------------------------------------------------------------------
 
-	Event_management::Event_receiver_shared click_receiver =Event_management::make_receiver([&pointer_arrow, &config_ref](const Event_management::Event& e)
+	Event_management::Event_receiver_shared click_receiver = Event_management::make_receiver([&pointer_arrow, &my_window_manager](const Event_management::Event& e)
 		{
 			if (e.type == Event_management::Event_type::Mouse_button_pressed)
 			{
@@ -363,7 +367,8 @@ int main()
 						return; //only check entities with "Tree" in their tag
 
 					glm::vec3 rayDir = Ray_casting::ScreenToWorldRay((float)mouse.mouse_x, (float)mouse.mouse_y,
-						config_ref.width, config_ref.height, fps_camera->projection, fps_camera->view);
+						my_window_manager.get_config_ref().width, my_window_manager.get_config_ref().height,
+						fps_camera->projection, fps_camera->view);
 
 					float dist = Ray_casting::ray_sphere_intersection(fps_camera->camera_position, rayDir,
 						glm::vec3(transform.position), 3.0f);
@@ -437,14 +442,19 @@ int main()
 			if (e.type == Event_management::Event_type::Window_framebuffer_resized)
 			{
 				const auto& resize = static_cast<const Window_framebuffer_resize_event&>(e);
-
 				fps_camera->update_projection(45.0f, resize.new_aspect_ratio, 0.1f, 500.0f);
 				printer->change_screen_size(resize.new_width, resize.new_height);
+				ui_manager.on_resize(resize.new_width, resize.new_height);
 			}
-			
+			if (e.type == Event_management::Event_type::Window_resized)
+			{
+				const auto& resize = static_cast<const Window_resize_event&>(e);
+				ui_manager.on_resize(resize.new_width, resize.new_height);
+			}
 		});
 
 	my_window_manager.subscribe(Event_management::Event_type::Window_framebuffer_resized, framebuffer_chnage_reciver);
+	my_window_manager.subscribe(Event_management::Event_type::Window_resized, framebuffer_chnage_reciver);
 
 	glEnable(GL_DEPTH_TEST); // Enable depth testing for 3D rendering
 	glEnable(GL_CULL_FACE); // Enable face culling to improve performance
