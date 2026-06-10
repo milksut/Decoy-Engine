@@ -1,22 +1,18 @@
 #pragma once
-
 #include <string>
 
-class Event_Manager; 
-
 namespace Decoy {
-
     class Layer
     {
     public:
-        Layer(const std::string& name = "Layer");
-        virtual ~Layer();
+        Layer(const std::string& name = "Layer") : m_DebugName(name) {}
+        virtual ~Layer() = default;
 
         virtual void onAttach() {}
         virtual void onDetach() {}
         virtual void onUpdate(float dt) {}
+        virtual void onRender() {}
         virtual void onImGuiRender() {}
-        virtual void onEvent(Event_Manager& event) {}
 
         const std::string& getName() const { return m_DebugName; }
 
