@@ -1,5 +1,6 @@
 #include "Camera_test.h"
 #include "game_object_basic.h"
+#include "Animation_manager.h"
 #include "Globals.h"
 #include "Shader.h"
 #include "Some_functions.h"
@@ -37,6 +38,15 @@ public:
 	Arrow(entt::registry& reg, const std::string& tag)
 		: game_object_basic(reg, tag)
 	{}
+};
+
+class Man : public game_object_basic<Man>
+{
+public:
+	Man(entt::registry& reg, const std::string& tag)
+		: game_object_basic(reg, tag)
+	{
+	}
 };
 
 std::unordered_map<unsigned int, Tree*> tree_map;
@@ -174,6 +184,9 @@ int main()
 	Shader ui_shader("Shaders/Vertex_shaders/Ui_vertex.vert",
 		"Shaders/Fragment_shaders/Ui_fragment.frag");
 
+	Shader animation_shader("Shaders/Vertex_shaders/Loaded_animation_vertex.vert",
+		"Shaders/Fragment_shaders/Loaded_model_fragment.frag");
+
 	Button* addButton = new Button(
 		glm::vec2(-0.95f, 0.0f),
 		glm::vec2(0.3f, 0.2f),
@@ -295,16 +308,36 @@ int main()
 	shader.setFloat("lights[0].linear", sun.linear);
 	shader.setFloat("lights[0].quadratic", sun.quadratic);
 
+	animation_shader.use();
+	animation_shader.setInt("num_of_lights", 1);
+	Logger::checkGLError("After changing light amount");
+
+	animation_shader.setBool("lights[0].has_a_source", sun.has_a_source);
+	animation_shader.setVec3("lights[0].light_pos", sun.light_pos);
+	animation_shader.setVec3("lights[0].light_target", sun.light_target);
+
+	animation_shader.setVec3("lights[0].ambient", sun.ambient);
+	animation_shader.setVec3("lights[0].diffuse", sun.diffuse);
+	animation_shader.setVec3("lights[0].specular", sun.specular);
+
+	animation_shader.setFloat("lights[0].cos_soft_cut_off_angle", sun.cos_soft_cut_off_angle);
+	animation_shader.setFloat("lights[0].cos_hard_cut_off_angle", sun.cos_hard_cut_off_angle);
+
+	animation_shader.setFloat("lights[0].constant", sun.constant);
+	animation_shader.setFloat("lights[0].linear", sun.linear);
+	animation_shader.setFloat("lights[0].quadratic", sun.quadratic);
+
 	Logger::checkGLError("After loading light");
 
 
-	backpack.import_model_from_file("Models\\Tree1.obj");
+	//backpack.import_model_from_file("Models\\Tree1.obj");
 	
-	backpack.add_instance_buffer(16, 3); //attrib size-mat4-16floats, attrib index, for model
+	//backpack.add_instance_buffer(16, MODEL_ATRIB_LAST_INDEX+1); //attrib size-mat4-16floats, attrib index, for model
 
-	backpack.add_instance_buffer(9, 7); //attrib size-mat3-12floats, attrib index, for transpose_inverse_viewXmodel
+	//backpack.add_instance_buffer(9, MODEL_ATRIB_LAST_INDEX+5); //attrib size-mat3-12floats, attrib index, for transpose_inverse_viewXmodel
 
-	Tree::set_model(&backpack, grid_amount* grid_amount, 3);
+	//Tree::set_model(&backpack, grid_amount* grid_amount);
+
 
 	for (int i = 0; i < grid_amount; i++)
 	{
@@ -313,6 +346,7 @@ int main()
 			Tree* t = new Tree(global_registry, "Tree_" + std::to_string(i) + "_" + std::to_string(j));
 			t->set_position({ i * 5.0f, 0.0f, j * 5.0f });
 			tree_map[t->get_id()] = t;
+
 		}
 	}
 
@@ -321,8 +355,8 @@ int main()
 	
 
 	int root_index = arrow.import_model_from_file("Models\\Cone.obj");
-	arrow.add_instance_buffer(16, 3);
-	arrow.add_instance_buffer(9, 7);
+	arrow.add_instance_buffer(16, MODEL_ATRIB_LAST_INDEX+1);
+	arrow.add_instance_buffer(9, MODEL_ATRIB_LAST_INDEX+5);
 	if(root_index < 0)
 	{
 		LOG_ERROR("Failed to load cone model!");
@@ -343,6 +377,33 @@ int main()
 	Arrow::set_model(&arrow, 1);
 	Arrow pointer_arrow(global_registry, "Pointer_arrow");
 	pointer_arrow.set_position({ 0.0f, 4.5f, 0.0f });
+
+	game_object_basic_model man_model;
+	man_model.import_model_from_file("C:\\Users\\altay\\Desktop\\data\\Dancing Twerk.fbx", false);
+	man_model.add_instance_buffer(16, MODEL_ATRIB_LAST_INDEX + 1);
+	man_model.add_instance_buffer(9, MODEL_ATRIB_LAST_INDEX + 5);
+
+	unsigned int number_of_minds_waiting_for_torment_root = 31;
+	std::vector<Man*> the_collective;
+	the_collective.reserve(number_of_minds_waiting_for_torment_root* number_of_minds_waiting_for_torment_root);
+
+	Man::set_model(&man_model, number_of_minds_waiting_for_torment_root * number_of_minds_waiting_for_torment_root);
+	for(int i = 0; i< number_of_minds_waiting_for_torment_root; i++)
+	{
+		for (int j = 0; j < number_of_minds_waiting_for_torment_root; j++)
+		{
+			Man* my_man = new Man(global_registry, "My_Man_" + std::to_string(i) + "_" + std::to_string(j));
+			my_man->set_position({ 10.0f * i, 0.0f, 10.0f* j });
+			my_man->set_scale({ 0.1f,0.1f,0.1f });
+			the_collective.push_back(my_man);
+		}
+		
+	}
+	
+
+	Animation_manager man_animator;
+	man_animator.Extract_bones_with_hierarchy(man_model);
+	man_animator.Extract_skeletal_animations();
 
 	//-------------------------------------------------------------------------------------------------------------
 
@@ -456,6 +517,8 @@ int main()
 	my_window_manager.subscribe(Event_management::Event_type::Window_framebuffer_resized, framebuffer_chnage_reciver);
 	my_window_manager.subscribe(Event_management::Event_type::Window_resized, framebuffer_chnage_reciver);
 
+
+
 	glEnable(GL_DEPTH_TEST); // Enable depth testing for 3D rendering
 	glEnable(GL_CULL_FACE); // Enable face culling to improve performance
 	//glCullFace(GL_FRONT_AND_BACK);
@@ -466,102 +529,107 @@ int main()
 	bool reverse_arrow_animation = false;
 
 	shader.bind_UBO("projectionXview_block",fps_camera->Ubo_slot);
+	animation_shader.bind_UBO("projectionXview_block", fps_camera->Ubo_slot);
+
+	int animation_ubo_slot = Animation_manager::get_Ubo_slot();
+	if(animation_ubo_slot>=0)
+		animation_shader.bind_UBO("Bone_block", animation_ubo_slot);
+
 
 	while (!window_should_close)
 	{
 
 		// Frustum culling test start --------------------------------------------------------------
 
-		Frustum frustum = Ray_casting::extract_frustum(*fps_camera);
+		//Frustum frustum = Ray_casting::extract_frustum(*fps_camera);
 
-		std::vector<unsigned int> visible_list;
-		std::vector<int> available_indices;
+		//std::vector<unsigned int> visible_list;
+		//std::vector<int> available_indices;
 
-		std::vector<void*>& region = Tree::get_class_region()->object_ptrs;
-		unsigned int region_size = (unsigned int)region.size();
+		//std::vector<void*>& region = Tree::get_class_region()->object_ptrs;
+		//unsigned int region_size = (unsigned int)region.size();
 
-		visible_list.reserve(region_size * 10);
-		available_indices.reserve(region_size);
+		//visible_list.reserve(region_size * 10);
+		//available_indices.reserve(region_size);
 
-		auto view = global_registry.view<Transform_component, Id_component, Tag_component, World_AABB_component>();
+		//auto view = global_registry.view<Transform_component, Id_component, Tag_component, World_AABB_component>();
 
-		view.each([&visible_list, &frustum](auto /*entity*/, Transform_component& /*transform*/,
-			Id_component& id_comp, Tag_component& tag_comp, World_AABB_component& aabb_comp)
-			{
+		//view.each([&visible_list, &frustum](auto /*entity*/, Transform_component& /*transform*/,
+		//	Id_component& id_comp, Tag_component& tag_comp, World_AABB_component& aabb_comp)
+		//	{
 
-				if (tag_comp.tag.find("Tree") == std::string::npos)
-				{
-					return; //only check entities with "Tree" in their tag
-				}
+		//		if (tag_comp.tag.find("Tree") == std::string::npos)
+		//		{
+		//			return; //only check entities with "Tree" in their tag
+		//		}
 
-				if (Ray_casting::aabb_in_frustum(frustum, aabb_comp.aabb))
-				{
-					visible_list.push_back(id_comp.id);
-				}
-			});
+		//		if (Ray_casting::aabb_in_frustum(frustum, aabb_comp.aabb))
+		//		{
+		//			visible_list.push_back(id_comp.id);
+		//		}
+		//	});
 
-		const unsigned int visible_amount = (unsigned int)visible_list.size();
+		//const unsigned int visible_amount = (unsigned int)visible_list.size();
 
-		for (unsigned int i = 0; i < visible_amount && i < region_size; i++)
-		{
-			game_object_base* ptr = static_cast<game_object_base*>(region[i]);
+		//for (unsigned int i = 0; i < visible_amount && i < region_size; i++)
+		//{
+		//	game_object_base* ptr = static_cast<game_object_base*>(region[i]);
 
-			if (ptr == nullptr)
-			{
-				available_indices.push_back(i);
-				continue;
-			}
+		//	if (ptr == nullptr)
+		//	{
+		//		available_indices.push_back(i);
+		//		continue;
+		//	}
 
-			unsigned int temp_id = ptr->get_id();
+		//	unsigned int temp_id = ptr->get_id();
 
-			auto index = std::find(visible_list.begin(), visible_list.end(), temp_id);
+		//	auto index = std::find(visible_list.begin(), visible_list.end(), temp_id);
 
-			if (index != visible_list.end())
-			{
-				*index = 0;
-				continue;
-			}
-			else
-			{
-				available_indices.push_back(i);
-				continue;
-			}
-		}
-		int index_in_availble_list = 0;
+		//	if (index != visible_list.end())
+		//	{
+		//		*index = 0;
+		//		continue;
+		//	}
+		//	else
+		//	{
+		//		available_indices.push_back(i);
+		//		continue;
+		//	}
+		//}
+		//int index_in_availble_list = 0;
 
-		for (unsigned int id : visible_list)
-		{
-			if (index_in_availble_list >= available_indices.size())
-			{
-				break;
-			}
-			if (id == 0)
-			{
-				continue;
-			}
+		//for (unsigned int id : visible_list)
+		//{
+		//	if (index_in_availble_list >= available_indices.size())
+		//	{
+		//		break;
+		//	}
+		//	if (id == 0)
+		//	{
+		//		continue;
+		//	}
 
-			int new_index = available_indices[index_in_availble_list++];
-			void* obj_ptr = region[new_index];
+		//	int new_index = available_indices[index_in_availble_list++];
+		//	void* obj_ptr = region[new_index];
 
-			if (obj_ptr == nullptr)
-			{
-				Global_object_map::get_object(id)->use_null_region_pos(new_index);
-			}
-			else
-			{
-				static_cast<game_object_base*>(obj_ptr)->swap_region_pos(id);
-			}
-		}
+		//	if (obj_ptr == nullptr)
+		//	{
+		//		Global_object_map::get_object(id)->use_null_region_pos(new_index);
+		//	}
+		//	else
+		//	{
+		//		static_cast<game_object_base*>(obj_ptr)->swap_region_pos(id);
+		//	}
+		//}
 		// Frustum culling test end -----------------------------------------------------------------
 
-		Tree::max_region_upload_index = visible_amount;
+		//Tree::max_region_upload_index = visible_amount;
 		game_object_base::Tick(global_registry);
+		man_animator.Tick(0.3 * (float)((glfwGetTime() - time_of_last_frame) / Target_frame_time));
 
 		Key_state state_holder_temp = my_input_manager->Get_key_state({ Mouse_input,GLFW_MOUSE_BUTTON_RIGHT });
 
 		camera_control = state_holder_temp == Pressed || state_holder_temp == Hold;
-
-
 
 
 		processInput(my_window_manager.get_handle(), 0.1f * (float)((glfwGetTime() - time_of_last_frame) / Target_frame_time), fps_camera);
@@ -575,9 +643,10 @@ int main()
 		shader.use();
 		shader.setVec3("viewPos", fps_camera->camera_position);
 
-		if(visible_amount>0)
-			Tree::draw(shader, visible_amount);
+		//if(visible_amount>0)
+			//Tree::draw(shader, visible_amount);
 		Arrow::draw(shader);
+		Man::draw(animation_shader);
 
 		Logger::checkGLError("After drawing grid backpack");
 

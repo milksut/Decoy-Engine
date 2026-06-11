@@ -91,7 +91,7 @@ public:
 		renderer = new Quad_renderer(&shader);
 
 		// Load texture atlas
-		texture_atlas.id = load_image(texture_path, width, height, nrChannels, image_packing, false);
+		texture_atlas.id = load_texture_from_file(texture_path, width, height, nrChannels, image_packing, false);
 		texture_atlas.type = TextureType::DIFFUSE;
 		texture_atlas.path = texture_path;
 		Texture_slots::new_texture_loaded(texture_atlas);

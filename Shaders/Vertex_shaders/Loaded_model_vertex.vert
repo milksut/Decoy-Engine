@@ -1,12 +1,17 @@
 #version 330 core
+#define MAX_BONES 100
+#define MAX_BONES_PER_VERTEX 4
+
 layout (location = 0) in vec3 aPos;
 layout (location = 1) in vec2 aTexCoord;
 layout (location = 2) in vec3 aNormal;
+layout (location = 3) in ivec4 boneIDs;
+layout (location = 4) in vec4 bone_weights;
 
-layout (location = 3) in mat4 model;// location 3,4,5,6 for mat4
-layout (location = 7) in vec4 line1;// location 7,8,9 for mat3
-layout (location = 8) in vec4 line2;// location 7,8,9 for mat3
-layout (location = 9) in float line3;// location 7,8,9 for mat3
+layout (location = 5) in mat4 model;// location 5,6,7,8 for mat4
+layout (location = 9) in vec4 line1;// location 9,10,11 for mat3
+layout (location = 10) in vec4 line2;// location 9,10,11 for mat3
+layout (location = 11) in float line3;// location 9,10,11 for mat3
 
 layout (std140) uniform projectionXview_block
 {

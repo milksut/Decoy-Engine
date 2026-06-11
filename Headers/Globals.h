@@ -11,6 +11,11 @@
 
 #define MAX_UBO_BINDING_POINTS 16 //OpenGL guarantees at least 16 uniform buffer binding points, so we can safely use binding points from 0 to 15
 #define MAX_MATERIALS        128  // max materials in UBO array, can be increased if needed, but keep in mind that UBOs have size limits (usually around 64KB)
+
+#define MODEL_ATRIB_LAST_INDEX 4 //last index used for mesh attributes, instance attributes start from this index + 1
+
+#define MAX_BONES 100
+#define MAX_BONES_PER_VERTEX 4
 //end of defines---------------------------------------------------------------------------------
 
 
@@ -74,9 +79,16 @@ enum Key_state
 //// X-Macros----------------------------------------------------------------------------------------
 	//TEX_TYPE MACRO------------------------------------------------------------------------------
 	#define TEX_TYPES \
-		X(DIFFUSE, aiTextureType_DIFFUSE, aiTextureType_BASE_COLOR) \
-		X(NORMAL , aiTextureType_NORMALS, aiTextureType_NONE) \
-		X(SPECULAR , aiTextureType_SPECULAR, aiTextureType_NONE) \
+	  X(DIFFUSE, aiTextureType_DIFFUSE, aiTextureType_BASE_COLOR) \
+	  X(NORMAL, aiTextureType_NORMALS, aiTextureType_NONE) \
+	  X(SPECULAR, aiTextureType_SPECULAR, aiTextureType_NONE) \
+	  X(BASECOLOR, aiTextureType_BASE_COLOR, aiTextureType_NONE) \
+	  X(METALLICROUGHNESS, aiTextureType_UNKNOWN, aiTextureType_NONE) \
+	  X(OCCLUSION, aiTextureType_LIGHTMAP, aiTextureType_NONE) \
+	  X(EMISSIVE, aiTextureType_EMISSIVE, aiTextureType_NONE) \
+	  X(HEIGHT, aiTextureType_HEIGHT, aiTextureType_NONE) \
+	  X(OPACITY, aiTextureType_OPACITY, aiTextureType_NONE) \
+	  X(UNKNOWN, aiTextureType_UNKNOWN, aiTextureType_NONE)
 
 	enum TextureType
 	{
@@ -156,9 +168,11 @@ struct Frustum {
 
 struct vertex_data
 {
-	float position[3];
-	float tex_coords[2];
-	float normal[3];
+	float position[3] = { 0, 0, 0 };
+	float tex_coords[2] = { 0,0 };
+	float normal[3] = { 0,0,0 };
+	int   bone_ids[MAX_BONES_PER_VERTEX]     = {-1,-1,-1,-1};
+	float bone_weights[MAX_BONES_PER_VERTEX] = { 0.0f, 0.0f, 0.0f, 0.0f};
 };
 
 struct class_region //VBO regions given to classes and data inside them
