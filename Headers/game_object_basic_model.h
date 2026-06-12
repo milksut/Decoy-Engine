@@ -29,9 +29,113 @@ static const aiTextureType Assimp_Tex_Types_2[] =
 	#undef X
 };
 
+//TODO:add param
+static glm::mat4 ai_to_glm(const aiMatrix4x4& m) {
+	return glm::mat4(m.a1, m.b1, m.c1, m.d1, m.a2, m.b2, m.c2, m.d2,
+		m.a3, m.b3, m.c3, m.d3, m.a4, m.b4, m.c4, m.d4);
+}
+
 class game_object_basic_model
 {
 public:
+	struct Bone_info
+	{
+		/*id is index in finalBoneMatrices*/
+		int id;
+
+		/*offset matrix transforms vertex from model space to bone space*/
+		glm::mat4 offset;
+
+	};
+
+	std::map<std::string, Bone_info> Bone_info_map;
+	int Bone_counter = 0;
+
+	glm::mat4 global_inverse_transform = glm::mat4(1.0f);
+
+	auto& Get_bone_info_map() { return Bone_info_map; }
+	int& Get_bone_count() { return Bone_counter; }
+	void Set_vertex_bone_data_to_default(vertex_data& vertex)
+	{
+		for (int i = 0; i < MAX_BONES_PER_VERTEX; i++)
+		{
+			vertex.bone_ids[i] = -1;
+			vertex.bone_weights[i] = 0.0f;
+		}
+	}
+
+	void Set_vertex_bone_data(vertex_data& vertex, int boneID, float weight)
+	{
+		for (int i = 0; i < MAX_BONES_PER_VERTEX; ++i)
+		{
+			if (vertex.bone_ids[i] == boneID)
+				break;
+
+			if (vertex.bone_ids[i] < 0)
+			{
+				vertex.bone_weights[i] = weight;
+				vertex.bone_ids[i] = boneID;
+				break;
+			}
+		}
+	}
+
+	void Extract_bone_weight_for_vertices(std::vector<vertex_data>& vertices, aiMesh* mesh)
+	{
+		for (int boneIndex = 0; boneIndex < mesh->mNumBones; ++boneIndex)
+		{
+			int boneID = -1;
+			std::string boneName = mesh->mBones[boneIndex]->mName.C_Str();
+			if (boneName == "")
+				boneName = "nameless_bone_" + std::to_string(boneIndex);
+			if (Bone_info_map.find(boneName) == Bone_info_map.end())
+			{
+				Bone_info newBoneInfo;
+				newBoneInfo.id = Bone_counter;
+				newBoneInfo.offset = ai_to_glm(mesh->mBones[boneIndex]->mOffsetMatrix);
+				Bone_info_map[boneName] = newBoneInfo;
+
+				boneID = Bone_counter;
+				Bone_counter++;
+			}
+			else
+			{
+				boneID = Bone_info_map[boneName].id;
+			}
+
+			assert(boneID != -1);
+
+			auto weights = mesh->mBones[boneIndex]->mWeights;
+			int numWeights = mesh->mBones[boneIndex]->mNumWeights;
+
+			for (int weightIndex = 0; weightIndex < numWeights; ++weightIndex)
+			{
+				int vertexId = weights[weightIndex].mVertexId;
+				float weight = weights[weightIndex].mWeight;
+				assert(vertexId < vertices.size());
+				Set_vertex_bone_data(vertices[vertexId], boneID, weight);
+			}
+		}
+		std::vector<int>bone_id_apper_counter(Bone_counter,0);
+		int bone_id_minus_one_counter = 0;
+		for (vertex_data& data : vertices)
+		{
+			for (int id : data.bone_ids)
+			{
+				id >= 0 ? bone_id_apper_counter[id]++ : bone_id_minus_one_counter++;
+			}
+				
+		}
+
+		for(int i =0; i< Bone_counter;i++)
+		{
+			LOG_DEBUG("Bone with id: %d appeared %d times.\n",i, bone_id_apper_counter[i]);
+		}
+
+		LOG_DEBUG("Bone with id: -1 appeared %d times.\n", bone_id_minus_one_counter);
+
+	}
+
 	class Mesh
 	{
 	private:
@@ -110,7 +214,7 @@ public:
 		/// <param name="attrib_index">[in] Attribute index of the instance buffer.</param>
 		void delete_instance_buffer(int attrib_index)
 		{
-			if (attrib_index >= VAO_MAX_ATTRIB_AMOUNT || attrib_index <= 2)
+			if (attrib_index >= VAO_MAX_ATTRIB_AMOUNT || attrib_index <= MODEL_ATRIB_LAST_INDEX)
 				return; // Invalid or mesh's attribute index
 
 			attribute attrib = instance_attributes[attrib_index];
@@ -145,9 +249,7 @@ public:
 				offset += region->size_in_number;
 			}
 		}
-
-
-public:
+	public:
 
 		std::vector<vertex_data>  main_vertices;
 		std::vector<unsigned int> main_indices;
@@ -161,6 +263,7 @@ public:
 
 		unsigned int VAO, VBO_Mesh, EBO;
 
+		//todo: fix param
 		/// <summary>
 		///     Constructs a mesh and uploads vertex, index, and texture data to GPU buffers.
 		/// </summary>
@@ -215,6 +318,17 @@ public:
 			glEnableVertexAttribArray(2);
 			glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, sizeof(vertex_data), (void*)offsetof(vertex_data, normal));
 			instance_attributes[2] = { VBO_Mesh,2,2,3* sizeof(float),0 };
+			
+			// vertex  Bones
+			glEnableVertexAttribArray(3);
+			glVertexAttribIPointer(3, 4, GL_INT, sizeof(vertex_data), (void*)offsetof(vertex_data, bone_ids));
+			instance_attributes[3] = { VBO_Mesh,3,3,4 * sizeof(int),0 };
+
+			//vertex  Bone weights
+			glEnableVertexAttribArray(4);
+			glVertexAttribPointer(4, 4, GL_FLOAT, GL_FALSE, sizeof(vertex_data), (void*)offsetof(vertex_data, bone_weights));
+			instance_attributes[4] = { VBO_Mesh,4,4,4 * sizeof(float),0 };
+			
 			glBindVertexArray(0);
 		}
 
@@ -331,7 +445,7 @@ public:
 			//resize VBOS and re upload data
 			for(attribute &attrib : instance_attributes)
 			{
-				if (attrib.attrib_start_index <= 2)
+				if (attrib.attrib_start_index <= MODEL_ATRIB_LAST_INDEX)
 					continue;
 
 				override_instance_buffer(attrib.attrib_size_bytes / sizeof(float), attrib.attrib_start_index, attrib.loop_instance);
@@ -375,7 +489,7 @@ public:
 			//resize VBOS and re upload data
 			for (attribute& attrib : instance_attributes)
 			{
-				if (attrib.attrib_start_index <= 2)
+				if (attrib.attrib_start_index <= MODEL_ATRIB_LAST_INDEX)
 					continue;
 
 				override_instance_buffer(attrib.attrib_size_bytes / sizeof(float), attrib.attrib_start_index, attrib.loop_instance);
@@ -391,7 +505,7 @@ public:
 		/// <param name="attrib_index">[in] Attribute index whose region data will be uploaded.</param>
 		void load_all_regions_for_attribute(int attrib_index)
 		{
-			if (attrib_index >= VAO_MAX_ATTRIB_AMOUNT || attrib_index <= 2)
+			if (attrib_index >= VAO_MAX_ATTRIB_AMOUNT || attrib_index <= MODEL_ATRIB_LAST_INDEX)
 				return; // Invalid or mesh's attribute index
 
 			attribute attrib = instance_attributes[attrib_index];
@@ -425,7 +539,7 @@ public:
 		///     Creates an instance buffer for per-instance vertex attributes (e.g. colors, model matrices).
 		///     This function only allocates GPU buffers for each known class region; it does not upload data.
 		///     Use load_instance_buffer / load_all_regions_for_attribute to fill the buffer after creation.
-		///     Most VAOs support ~16 attribute slots (0->2 reserved for mesh data). Each slot can store up to 4 floats.
+		///     Most VAOs support ~16 attribute slots (0->4 reserved for mesh data). Each slot can store up to 4 floats.
 		///     If more is needed, multiple attribute indices are used.
 		///     Ensure sufficient vector capacity for all instance data; otherwise undefined behavior may occur.
 		/// </summary>
@@ -442,7 +556,7 @@ public:
 			}
 			int index_amount = (attrib_size / 4) + (attrib_size % 4 == 0 ? 0 : 1);
 
-			if (attrib_index + index_amount - 1 >= VAO_MAX_ATTRIB_AMOUNT || attrib_index <= 2)
+			if (attrib_index + index_amount - 1 >= VAO_MAX_ATTRIB_AMOUNT || attrib_index <= MODEL_ATRIB_LAST_INDEX)
 			{
 				LOG_ERROR("Game_object_basic_model: Invalid attribute index or index range exceeds VAO maximum attribute amount");
 				return -1; // Invalid or mesh's attribute index
@@ -517,7 +631,7 @@ public:
 			std::shared_ptr<class_region> region, unsigned int data_offset_by_attrib_size = 0)
 		{
 			//TODO: log the errors.
-			if (attrib_index >= VAO_MAX_ATTRIB_AMOUNT || attrib_index <= 2)
+			if (attrib_index >= VAO_MAX_ATTRIB_AMOUNT || attrib_index <= MODEL_ATRIB_LAST_INDEX)
 				return; // Invalid or mesh's attribute index
 
 			attribute attrib = instance_attributes[attrib_index];
@@ -557,7 +671,7 @@ public:
 					if (attrib.VBO == 0)
 						continue;
 
-					if(attrib.attrib_start_index <=2)
+					if(attrib.attrib_start_index <= MODEL_ATRIB_LAST_INDEX)
 						continue; //mesh attribute
 
 					glBindBuffer(GL_ARRAY_BUFFER, attrib.VBO);
@@ -663,6 +777,9 @@ public:
 		for (unsigned int i = 0; i < mesh->mNumVertices; i++)
 		{
 			vertex_data vertex;
+
+			Set_vertex_bone_data_to_default(vertex);
+
 			//positions
 			vertex.position[0] = mesh->mVertices[i].x;
 			vertex.position[1] = mesh->mVertices[i].y;
@@ -693,6 +810,8 @@ public:
 			}
 			vertices.push_back(vertex);
 		}
+		Extract_bone_weight_for_vertices(vertices, mesh);
+
 		//process indices
 		for (unsigned int i = 0; i < mesh->mNumFaces; i++)
 		{
@@ -714,13 +833,21 @@ public:
 				{
 					Texture* texture;
 					aiString str;
+					bool is_embedded_texture = false;
 
 					//assimp_type - Texture type, j - Index of the texture to get, &str - output path
 					material->GetTexture(assimp_type, j, &str);
 
-					std::string directory = path.substr(0, path.find_last_of('\\'));
-					str.Set((directory + '\\' + str.C_Str()).c_str());
+					const aiTexture* embeddedTexture = scene->GetEmbeddedTexture(str.C_Str());
 
+					if (embeddedTexture == nullptr)
+					{
+						std::string directory = path.substr(0, path.find_last_of('\\'));
+						str.Set((directory + '\\' + str.C_Str()).c_str());
+					}
+					
+
+					//TODO: Add Logs
 					texture = Texture_slots::get_loaded_texture(str.C_Str());//check if texture was loaded before
 					if (texture != nullptr)
 					{
@@ -728,11 +855,39 @@ public:
 					}
 					else
 					{
-						// data returned by load_image but unused here
+						// data returned by load_texture_from_file but unused here
 						int unused_data1 = 0, unused_data2 = 0, unused_data3 = 0;
 						texture = new Texture();
+						if (embeddedTexture != nullptr)
+						{
 
-						texture->id = load_image(str.C_Str(), unused_data1, unused_data2, unused_data3);
+							if (embeddedTexture->mHeight == 0)
+							{
+								// compressed format (PNG/JPEG) stored in embeddedTexture->pcData, size in mWidth
+								size_t dataSize = static_cast<size_t>(embeddedTexture->mWidth);
+								const unsigned char* dataPtr = reinterpret_cast<const unsigned char*>(embeddedTexture->pcData);
+								int w = 0, h = 0, channels = 0;
+								texture->id = load_image_from_memory(dataPtr, dataSize, w, h, channels, 4, true);
+							}
+							else
+							{
+								// uncompressed RGBA8888: mWidth = width, mHeight = height, pcData points to pixels
+								int w = static_cast<int>(embeddedTexture->mWidth);
+								int h = static_cast<int>(embeddedTexture->mHeight);
+								int channels = 4; // Assimp stores uncompressed embedded textures as RGBA
+								unsigned char* pixels = reinterpret_cast<unsigned char*>(embeddedTexture->pcData);
+								texture->id = process_image(pixels, w, h, channels, 4);
+								// Note: process_image calls stbi_image_free on the data pointer,
+								// so do NOT free embeddedTexture->pcData here (Assimp owns it). If process_image
+								// must not free it, duplicate the buffer first or modify process_image.
+							}
+
+						}
+						else
+						{
+							texture->id = load_texture_from_file(str.C_Str(), unused_data1, unused_data2, unused_data3);
+						}
+
 						texture->type = static_cast<TextureType>(i);
 						texture->path = str.C_Str();
 
@@ -783,12 +938,13 @@ public:
 			uses_material_flag = true;
 		}
 
-		std::shared_ptr<Mesh> mesh_ptr = std::make_shared<Mesh>(vertices,indices,textures);
+		std::shared_ptr<Mesh> mesh_ptr = std::make_shared<Mesh>(vertices, indices, textures);
 		mesh_ptr->mesh_material_id = uses_material_flag ? Material_slots::register_material(mat_props) : 0;
 		return mesh_ptr;
 	}
 
-public:
+	Assimp::Importer scene_importer;
+	const aiScene* last_scene_pointer = nullptr;
 
 	std::vector<std::shared_ptr<Mesh>> Meshes;//you cant use copy constructor or assignment operator because of Mesh class
 
@@ -940,7 +1096,7 @@ public:
 	/// <remarks>
 	///     Only allocates buffers. Use load_instance_buffer to fill data.
 	///     If expanding existing buffers, data must be reloaded after.
-	///     VAO typically supports ~16 attribute slots (0->2 reserved for mesh data).
+	///     VAO typically supports ~16 attribute slots (0->4 reserved for mesh data).
 	///     Each slot can hold up to 4 floats; larger data uses multiple slots.
 	///     Ensure sufficient instance data capacity; otherwise undefined behavior may occur.
 	/// </remarks>
@@ -986,23 +1142,28 @@ public:
 	///     Loads scene data, then processes the root node recursively into engine meshes.
 	/// </remarks>
 	/// <param name="path">[in] File path of the model to import.</param>
-	int import_model_from_file(std::string path)
+	int import_model_from_file(std::string path, const bool flip_uvs = true)
 	{
-		Assimp::Importer importer;
-		const aiScene* scene = importer.ReadFile(path, aiProcess_Triangulate | aiProcess_FlipUVs | aiProcess_CalcTangentSpace);
+		const aiScene* scene = scene_importer.ReadFile(path, aiProcess_Triangulate 
+			| (flip_uvs ? aiProcess_FlipUVs : 0u) | aiProcess_CalcTangentSpace);
+
 		if (!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !scene->mRootNode)
 		{
-			LOG_ERROR("Assimp error: %s", importer.GetErrorString());
+			LOG_ERROR("Assimp error: %s", scene_importer.GetErrorString());
 			return -1;
 		}
 		else
 		{
+			last_scene_pointer = const_cast<aiScene*>(scene); // Store pointer for potential future use
+			global_inverse_transform = glm::inverse(ai_to_glm(last_scene_pointer->mRootNode->mTransformation));
 			Mesh_Childs new_root;
 			process_node(scene->mRootNode, scene, new_root,path);
 			roots.push_back(std::move(new_root));
 			update_model_aabb();
 			return (int)roots.size() - 1;
 		}
+
+		
 	}
 
 	/// <summary>
@@ -1050,7 +1211,6 @@ public:
 			update_model_aabb();
 		}
 	}
-
 	//unneded? maybe just use a for loop?
 
 	/// <summary>

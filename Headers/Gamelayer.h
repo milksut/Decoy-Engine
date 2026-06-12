@@ -221,10 +221,10 @@ public:
 
         // ---- Models ----
         m_tree_model.import_model_from_file("Models\\Tree1.obj");
-        m_tree_model.add_instance_buffer(16, 3);
-        m_tree_model.add_instance_buffer(9, 7);
+        m_tree_model.add_instance_buffer(16, MODEL_ATRIB_LAST_INDEX+1);
+        m_tree_model.add_instance_buffer(9, MODEL_ATRIB_LAST_INDEX+5);
 
-        Tree::set_model(&m_tree_model, grid_amount * grid_amount, 3);
+        Tree::set_model(&m_tree_model, grid_amount * grid_amount);
 
         for (int i = 0; i < grid_amount; i++)
             for (int j = 0; j < grid_amount; j++)
@@ -237,8 +237,8 @@ public:
 
         m_arrow_model.import_model_from_file("Models\\Cylinder.obj");
         int root_index = m_arrow_model.import_model_from_file("Models\\Cone.obj");
-        m_arrow_model.add_instance_buffer(16, 3);
-        m_arrow_model.add_instance_buffer(9, 7);
+        m_arrow_model.add_instance_buffer(16, MODEL_ATRIB_LAST_INDEX +1);
+        m_arrow_model.add_instance_buffer(9, MODEL_ATRIB_LAST_INDEX + 5);
 
         if (root_index >= 0)
         {
