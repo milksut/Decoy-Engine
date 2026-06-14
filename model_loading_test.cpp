@@ -12,10 +12,9 @@ int main()
 
     App app(cfg);
 
-    GameLayer* game = new GameLayer(&app);
-    game->grid_amount = 25;
+    GameLayer* game = new GameLayer(app);
 
-    app.push_layer(game);
+    app.push_layer(std::unique_ptr<GameLayer>(game));
 
     app.run();
 

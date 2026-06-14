@@ -3,9 +3,7 @@
 #include "Globals.h"
 #include "Window_manager.h"
 #include "The_event_manager.h"
-#include "Layer.h"
-#include "LayerStack.h"
-
+#include "Layer_manager.h"
 
 class App
 {
@@ -18,21 +16,21 @@ public:
     };
 
 private:
-    Config                      m_config;
-    Event_manager               m_event_manager;
-    Window_Manager              m_window;
-    Decoy::LayerStack           m_layer_stack;
+    Config         m_config;
+    Event_manager  m_event_manager;
+    Window_Manager m_window;
+    Layer_manager  m_layer_manager;
 
-    bool                        m_running = true;
-    double                      m_last_frame_time = 0.0;
+    bool   m_running = true;
+    double m_last_frame_time = 0.0;
 
     Event_management::Event_receiver_shared m_close_receiver;
-    Event_management::Event_receiver_shared m_framebuffer_receiver;
 
 public:
     Event_manager& get_event_manager() { return m_event_manager; }
     Window_Manager& get_window() { return m_window; }
     Input_Manager* get_input_manager() { return m_window.get_input_manager(); }
+    Layer_manager& get_layer_manager() { return m_layer_manager; }
 
     explicit App(const Config& cfg = Config())
         : m_config(cfg)
@@ -52,17 +50,22 @@ public:
 
     ~App()
     {
-
+        m_layer_manager.clear_all_layers();
     }
 
-    void push_layer(Decoy::Layer* layer)
+    int push_layer(std::unique_ptr<Layer> layer, int index = -1)
     {
-        m_layer_stack.pushLayer(layer);
+        return m_layer_manager.try_add_layer(std::move(layer), index);
     }
 
-    void push_overlay(Decoy::Layer* overlay)
+    void remove_layer(const std::string& name)
     {
-        m_layer_stack.pushOverlay(overlay);
+        m_layer_manager.remove_layer(name);
+    }
+
+    Layer* get_layer(const std::string& name)
+    {
+        return m_layer_manager.get_layer(name);
     }
 
     void run()
@@ -71,20 +74,14 @@ public:
 
         while (m_running)
         {
-            double now = glfwGetTime();
-            float  dt = (float)(now - m_last_frame_time);
-            m_last_frame_time = now;
-
-            for (Decoy::Layer* layer : m_layer_stack)
-                layer->onUpdate(dt);
+            m_layer_manager.update_all_layers();
 
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-            for (Decoy::Layer* layer : m_layer_stack)
-                layer->onRender();
+            m_layer_manager.render_all_layers();
 
             get_input_manager()->Poll_keys();
-            m_window.Tick(); // swap buffers + glfwPollEvents
+            m_window.Tick();
         }
     }
 };
