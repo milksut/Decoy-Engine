@@ -2,8 +2,12 @@
 
 #include "Globals.h"
 
-//TODO: add params
-
+/// <summary>
+///     Event triggered when the application window is resized.
+/// </summary>
+/// <remarks>
+///     Stores the new window dimensions and computed aspect ratio.
+/// </remarks>
 struct Window_resize_event : public Event_management::Event
 {
 	int new_width;
@@ -15,6 +19,12 @@ struct Window_resize_event : public Event_management::Event
 	{}
 };	
 
+/// <summary>
+///     Event triggered when the window framebuffer is resized.
+/// </summary>
+/// <remarks>
+///     Stores the new framebuffer dimensions and computed aspect ratio.
+/// </remarks>
 struct Window_framebuffer_resize_event : public Event_management::Event
 {
 	int new_width;
@@ -26,6 +36,12 @@ struct Window_framebuffer_resize_event : public Event_management::Event
 	{}
 };
 
+/// <summary>
+///     Event triggered when the window is requested to close.
+/// </summary>
+/// <remarks>
+///     Contains no additional data; only signals a close request.
+/// </remarks>
 struct Window_close_event : public Event_management::Event
 {
     Window_close_event()
@@ -33,6 +49,10 @@ struct Window_close_event : public Event_management::Event
     {}
 };
 
+/// <summary>
+///     Event triggered when the window is opened.
+/// </summary>
+/// <param name="none">This event has no parameters.</param>
 struct Window_open_event : public Event_management::Event
 {
     Window_open_event()
@@ -40,6 +60,9 @@ struct Window_open_event : public Event_management::Event
     {}
 };
 
+/// <summary>
+/// Triggered when the window gains focus.
+/// </summary>
 struct Window_focus_event : public Event_management::Event
 {
     Window_focus_event()
@@ -47,6 +70,7 @@ struct Window_focus_event : public Event_management::Event
     {}
 };
 
+/// <summary>Triggered when the window loses focus.</summary>
 struct Window_unfocus_event : public Event_management::Event
 {
     Window_unfocus_event()
@@ -54,6 +78,7 @@ struct Window_unfocus_event : public Event_management::Event
     {}
 };
 
+/// <summary>Triggered when the window is minimized (iconified).</summary>
 struct Window_iconify_event : public Event_management::Event
 {
 
@@ -62,6 +87,7 @@ struct Window_iconify_event : public Event_management::Event
     {}
 };
 
+/// <summary>Triggered when the window is restored from minimized state.</summary>
 struct Window_uniconify_event : public Event_management::Event
 {
 
@@ -70,6 +96,7 @@ struct Window_uniconify_event : public Event_management::Event
     {}
 };
 
+/// <summary>Triggered when the window is maximized.</summary>
 struct Window_maximize_event : public Event_management::Event
 {
 
@@ -78,6 +105,7 @@ struct Window_maximize_event : public Event_management::Event
     {}
 };
 
+/// <summary>Triggered when the window is restored from maximized or minimized state.</summary>
 struct Window_restore_event : public Event_management::Event
 {
 
@@ -86,6 +114,7 @@ struct Window_restore_event : public Event_management::Event
     {}
 };
 
+/// <summary>Triggered when the window is moved on the screen.</summary>
 struct Window_move_event : public Event_management::Event
 {
     int x, y;
@@ -96,6 +125,7 @@ struct Window_move_event : public Event_management::Event
     {}
 };
 
+/// <summary>Triggered when the window content scaling changes (e.g., DPI scaling).</summary>
 struct Window_content_scale_event : public Event_management::Event
 {
     float x_scale, y_scale;
@@ -106,6 +136,8 @@ struct Window_content_scale_event : public Event_management::Event
     {}
 };
 
+/// <summary>Triggered when the window requests a redraw/refresh.</summary>
+/// <remarks>Usually fired when the window content needs to be repainted.</remarks>
 struct Window_refresh_event : public Event_management::Event
 {
     Window_refresh_event()

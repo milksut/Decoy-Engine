@@ -26,12 +26,15 @@ public:
 
     double mouse_x = 0, mouse_y = 0, mouse_sensitivity = 1;  
 
-    //TODO:fix params
     /// <summary>
-    ///     Initializes the input manager, sets up event channels and registers GLFW input callbacks. Width and height only used for starting mouse position.
+    ///     Initializes the input manager and creates default input channels.
     /// </summary>
-    /// <param name="event_manager">[in] Reference to the event manager used for input events.</param>
-    /// <param name="window">[in] Pointer to the GLFW window used for input callbacks.</param>
+    /// <remarks>
+    ///     Validates GLFW window user pointer and registers all predefined input channels
+    ///     in the event manager.
+    /// </remarks>
+    /// <param name="event_manager_in">[in] Reference to the event manager used for input events.</param>
+    /// <param name="window_in">[in] Pointer to the GLFW window used for input callbacks.</param>
     Input_Manager(Event_manager& event_manager_in, GLFWwindow* window_in)
         : event_manager(event_manager_in), window(window_in)
     {
@@ -181,11 +184,10 @@ public:
     }
 
 
-    //TODO: fix param
     /// <summary>
     ///     Subscribes a receiver to a specific input channel and event type.
     /// </summary>
-    /// <param name="channel">[in] Input channel to subscribe to.</param>
+    /// <param name="channel_name">[in] Input channel name to subscribe to.</param>
     /// <param name="event_type">[in] Type of event to listen for.</param>
     /// <param name="receiver">[in] Event receiver to be notified.</param>
     void subscribe(std::string channel_name, const Event_management::Event_type event_type, const Event_management::Event_receiver_shared& receiver)
@@ -193,13 +195,20 @@ public:
 		event_manager.subscribe(channel_name, event_type, receiver);
     }
 
-    //TODO: add param
+    /// <summary>
+    ///     Sends an event to the specified input channel.
+    /// </summary>
+    /// <param name="channel_name">[in] Input channel name where the event will be sent.</param>
+    /// <param name="event">[in] Event object to send.</param>
     void throw_event(std::string channel_name, std::unique_ptr<Event_management::Event> event)
     {
         event_manager.throw_event(channel_name, std::move(event));
 	}
 
-    //TODO: add param
+    /// <summary>
+    ///     Creates a new input event channel.
+    /// </summary>
+    /// <param name="channel_name">[in] Name of the channel to create.</param>
     void create_channel(std::string channel_name)
     {
         event_manager.create_channel(channel_name);
