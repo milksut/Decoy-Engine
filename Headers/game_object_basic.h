@@ -313,7 +313,13 @@ private:
 		return registry.get<Transform_component>(this_object);
 	}
 
-	//TODO:add param
+	/// <summary>
+	///     Returns a pointer to the object's World_AABB_component.
+	/// </summary>
+	/// <remarks>
+	///     Queries the ECS registry; returns nullptr if the component does not exist.
+	/// </remarks>
+	/// <returns>Pointer to World_AABB_component or nullptr.</returns>
 	World_AABB_component* get_world_aabb_ref() const
 	{
 		return registry.try_get<World_AABB_component>(this_object);
@@ -506,18 +512,18 @@ protected:
 	}
 
 
-	//TODO: fix param
 	/// <summary>
 	///     Constructs a game object and registers it in the ECS and global object map.
 	/// </summary>
 	/// <remarks>
 	///     Creates an entity, assigns ID, tag, transform, optional parent-child hierarchy,
-	///     and places the object into a class region slot if available.
+	///     optionally assigns a special region, and places the object into a region slot if available.
 	///     Finally marks the object as needing a transform update.
 	/// </remarks>
 	/// <param name="registry_in">[in] ECS registry reference.</param>
 	/// <param name="tag">[in] Debug/tag name of the object.</param>
 	/// <param name="parent_object">[in] Optional parent object for hierarchy.</param>
+	/// <param name="special_region">[in] Optional custom region override for the object.</param>
 	/// <param name="transform">[in] Initial transform component.</param>
 	game_object_basic(entt::registry& registry_in, const std::string& tag = "Undefined tag", game_object_basic* parent_object = nullptr,
 		std::shared_ptr<class_region> special_region = nullptr, Transform_component transform = Transform_component())
@@ -575,7 +581,16 @@ public:
 
 	static inline int max_region_upload_index = std::numeric_limits<int>::max();// up to what point in the region we should try to upload transforms
 
-	//Todo:add param
+	/// <summary>
+	///     Attempts to assign the object to an available slot in its active region.
+	/// </summary>
+	/// <remarks>
+	///     Uses special_region if available, otherwise falls back to the default region.
+	///     Searches for an empty slot, or expands the region if allowed.
+	/// </remarks>
+	/// <returns>
+	///     Assigned region slot index, or -1 if assignment fails.
+	/// </returns>
 	int try_assign_region_slot()
 	{
 
@@ -657,7 +672,13 @@ public:
 		return get_transform_ref();
 	}
 
-	//TODO:add param
+	/// <summary>
+	///     Returns a copy of the object's world AABB (Axis-Aligned Bounding Box).
+	/// </summary>
+	/// <remarks>
+	///     If no AABB exists, returns a default-constructed component.
+	/// </remarks>
+	/// <returns>Copy of World_AABB_component.</returns>
 	World_AABB_component get_world_aabb_copy() const
 	{
 		World_AABB_component* aabb = get_world_aabb_ref();
@@ -743,7 +764,13 @@ public:
 		return region;
 	}
 
-	//todo: add param
+	/// <summary>
+	///     Returns the currently active region of the object.
+	/// </summary>
+	/// <remarks>
+	///     Prefers the special region if it exists, otherwise returns the class region.
+	/// </remarks>
+	/// <returns>Shared pointer to the active region.</returns>
 	std::shared_ptr<class_region> get_active_region() const override
 	{
 		return special_region ? special_region : region;
@@ -781,14 +808,20 @@ public:
 		trigger_pos_changed_flags();
 	}
 
-	//todo:add param
+	/// <summary>
+	///     Sets the object's rotation using a quaternion.
+	/// </summary>
+	/// <param name="new_rot">[in] New rotation quaternion.</param>
 	void set_rotation_quat(const glm::quat& new_rot)
 	{
 		get_transform_ref().rotation_quat = new_rot;
 		trigger_pos_changed_flags();
 	}
 
-	//Todo:add param
+	/// <summary>
+	///     Enables or disables quaternion-based rotation for the transform.
+	/// </summary>
+	/// <param name="is_using_quat">[in] True to enable quaternion rotation, false for Euler.</param>
 	void set_is_using_quat(const bool is_using_quat)
 	{
 		get_transform_ref().use_quat = is_using_quat;
@@ -829,7 +862,13 @@ public:
 
 	//TODO: add rotare in quats
 
-	//todo: add param
+	/// <summary>
+	///     Applies a transformation matrix to the object's current transform.
+	/// </summary>
+	/// <remarks>
+	///     Multiplies the current transform by the given matrix and marks the object as changed.
+	/// </remarks>
+	/// <param name="transform_matrix">[in] Transformation matrix to apply.</param>
 	void apply_transform(const glm::mat4& transform_matrix)
 	{
 		get_transform_ref() *= transform_matrix;
@@ -865,13 +904,19 @@ public:
 		return get_transform_ref().scale;
 	}
 
-	//TODO:add param
+	/// <summary>
+	///     Returns the object's rotation as a quaternion.
+	/// </summary>
+	/// <returns>Current rotation quaternion.</returns>
 	glm::quat get_rotation_quat() const
 	{
 		return get_transform_ref().rotation_quat;
 	}
 
-	//TODO:add param
+	/// <summary>
+	///     Returns whether the object uses quaternion-based rotation.
+	/// </summary>
+	/// <returns>True if quaternion rotation mode is enabled.</returns>
 	bool get_is_using_quat() const
 	{
 		return get_transform_ref().use_quat;
@@ -943,16 +988,17 @@ public:
 
 	//--- draw -----------------------------------------------------------------------------------
 
-	//todo: fix param
 	/// <summary>
-	///     Draws the object using its bound model and instance region.
+	///     Draws the object using its assigned model and instance region.
 	/// </summary>
 	/// <remarks>
+	///     Uses the provided drawing region if available, otherwise uses the object's default region.
 	///     If amount is 0, draws the full region. If amount exceeds region size,
-	///     it is clamped to region size.
+	///     it is clamped to the region size.
 	/// </remarks>
 	/// <param name="shader">[in] Shader used for rendering.</param>
 	/// <param name="amount">[in] Number of instances to draw (0 = full region).</param>
+	/// <param name="drawing_region">[in] Optional region to draw from.</param>
 	/// <returns>0 on success, -1 if model is not set.</returns>
 	static int draw(Shader& shader, unsigned int amount = 0, std::shared_ptr<class_region> drawing_region = nullptr)
 	{
@@ -980,8 +1026,16 @@ public:
 
 	//special region functions, this is for objects that want to have their own region rather than sharing with other objects of the same class
 	//dont forget this stops them from drawn with basic call, you need to call it with special region as param to draw them
-	//TODO: add params
 
+	/// <summary>
+	///     Creates and assigns a private special region for the object.
+	/// </summary>
+	/// <remarks>
+	///     Removes the object from its current class region, allocates a new region,
+	///     assigns the first slot to the object, and registers transform upload callback.
+	/// </remarks>
+	/// <param name="new_region_size">[in] Size of the special region to create.</param>
+	/// <returns>Created special region, or nullptr if creation fails.</returns>
 	std::shared_ptr<class_region> use_special_region(const unsigned int new_region_size = 1)
 	{
 		if (special_region)
@@ -1019,7 +1073,14 @@ public:
 		return special_region;
 	}
 
-	//todo: dd param
+	/// <summary>
+	///     Assigns a special region to the object and updates its region slot.
+	/// </summary>
+	/// <remarks>
+	///     Removes the object from its current class region, assigns the new special region,
+	///     attempts to reserve a slot, and marks the object for transform upload.
+	/// </remarks>
+	/// <param name="new_region">[in] New special region to assign.</param>
 	void use_special_region(std::shared_ptr<class_region> new_region)
 	{
 		if (!new_region)

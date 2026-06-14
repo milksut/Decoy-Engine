@@ -5,8 +5,19 @@
 #include <iostream>
 #include "stb_image.h"
 
-//Todo:add param
-//a helper function used to load images
+/// <summary>
+///     Creates an OpenGL texture from decoded image data.
+/// </summary>
+/// <remarks>
+///     Configures texture parameters, uploads pixel data to GPU,
+///     generates mipmaps, and frees the CPU-side image memory.
+/// </remarks>
+/// <param name="data">[in] Raw image pixel data (stb_image decoded).</param>
+/// <param name="width">[in,out] Image width.</param>
+/// <param name="height">[in,out] Image height.</param>
+/// <param name="nrChannels">[in,out] Number of color channels in the image.</param>
+/// <param name="packing">[in] Pixel alignment (default = 4).</param>
+/// <returns>Generated OpenGL texture ID, or 0 on failure.</returns>
 unsigned int process_image(unsigned char* data, int& width, int& height, int& nrChannels, const int packing = 4)
 {
 	unsigned int texture;
@@ -78,7 +89,21 @@ unsigned int load_texture_from_file(const char* image_path, int& width, int& hei
 	return texture_id;
 }
 
-//TODO: add param
+/// <summary>
+///     Loads an image from memory data and creates an OpenGL texture.
+/// </summary>
+/// <remarks>
+///     Decodes image data using stb_image, processes the result into a texture,
+///     and returns the generated texture ID.
+/// </remarks>
+/// <param name="data">[in] Raw image data stored in memory.</param>
+/// <param name="data_size">[in] Size of the image data in bytes.</param>
+/// <param name="width">[out] Decoded image width.</param>
+/// <param name="height">[out] Decoded image height.</param>
+/// <param name="nrChannels">[out] Number of image color channels.</param>
+/// <param name="packing">[in] Texture pixel alignment value (default = 4).</param>
+/// <param name="flip_vertically">[in] Whether to flip the image vertically (default = true).</param>
+/// <returns>OpenGL texture ID, or 0 if loading fails.</returns>
 unsigned int load_image_from_memory(const unsigned char* data, size_t data_size,
 	int& width, int& height, int& nrChannels,
 	int packing = 4, bool flip_vertically = true)

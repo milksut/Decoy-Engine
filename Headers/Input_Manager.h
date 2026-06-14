@@ -181,11 +181,10 @@ public:
     }
 
 
-    //TODO: fix param
     /// <summary>
     ///     Subscribes a receiver to a specific input channel and event type.
     /// </summary>
-    /// <param name="channel">[in] Input channel to subscribe to.</param>
+    /// <param name="channel_name">[in] Input channel name to subscribe to.</param>
     /// <param name="event_type">[in] Type of event to listen for.</param>
     /// <param name="receiver">[in] Event receiver to be notified.</param>
     void subscribe(std::string channel_name, const Event_management::Event_type event_type, const Event_management::Event_receiver_shared& receiver)
@@ -193,13 +192,20 @@ public:
 		event_manager.subscribe(channel_name, event_type, receiver);
     }
 
-    //TODO: add param
+    /// <summary>
+    ///     Sends an event to the specified input channel.
+    /// </summary>
+    /// <param name="channel_name">[in] Input channel name where the event will be sent.</param>
+    /// <param name="event">[in] Event object to send.</param>
     void throw_event(std::string channel_name, std::unique_ptr<Event_management::Event> event)
     {
         event_manager.throw_event(channel_name, std::move(event));
 	}
 
-    //TODO: add param
+    /// <summary>
+    ///     Creates a new input event channel.
+    /// </summary>
+    /// <param name="channel_name">[in] Name of the channel to create.</param>
     void create_channel(std::string channel_name)
     {
         event_manager.create_channel(channel_name);

@@ -29,7 +29,14 @@ static const aiTextureType Assimp_Tex_Types_2[] =
 	#undef X
 };
 
-//TODO:add param
+/// <summary>
+///     Converts an Assimp matrix to a GLM matrix.
+/// </summary>
+/// <remarks>
+///     Maps the elements of aiMatrix4x4 into the corresponding glm::mat4 format.
+/// </remarks>
+/// <param name="m">[in] Assimp 4x4 transformation matrix.</param>
+/// <returns>Equivalent GLM 4x4 matrix.</returns>
 static glm::mat4 ai_to_glm(const aiMatrix4x4& m) {
 	return glm::mat4(m.a1, m.b1, m.c1, m.d1, m.a2, m.b2, m.c2, m.d2,
 		m.a3, m.b3, m.c3, m.d3, m.a4, m.b4, m.c4, m.d4);
@@ -263,10 +270,13 @@ public:
 
 		unsigned int VAO, VBO_Mesh, EBO;
 
-		//todo: fix param
 		/// <summary>
 		///     Constructs a mesh and uploads vertex, index, and texture data to GPU buffers.
 		/// </summary>
+		/// <remarks>
+		///     Initializes VAO/VBO/EBO, uploads vertex and index data, configures vertex attributes
+		///     (position, UV, normal, bone IDs, bone weights), and computes bounding box if vertices exist.
+		/// </remarks>
 		/// <param name="vertices">[in] Vertex data of the mesh.</param>
 		/// <param name="indices">[in] Index data of the mesh.</param>
 		/// <param name="textures">[in] Textures associated with the mesh.</param>
@@ -630,16 +640,28 @@ public:
 		void load_instance_buffer(float* data, unsigned int amount_in_attrib_size, int attrib_index,
 			std::shared_ptr<class_region> region, unsigned int data_offset_by_attrib_size = 0)
 		{
-			//TODO: log the errors.
 			if (attrib_index >= VAO_MAX_ATTRIB_AMOUNT || attrib_index <= MODEL_ATRIB_LAST_INDEX)
-				return; // Invalid or mesh's attribute index
+			{
+				LOG_ERROR("load_instance_buffer: Invalid attrib_index (%d). Valid range: %d - %d",
+					attrib_index, MODEL_ATRIB_LAST_INDEX + 1, VAO_MAX_ATTRIB_AMOUNT - 1);
+				return;
+			}
 
 			attribute attrib = instance_attributes[attrib_index];
 			if (attrib.VBO == 0)
-				return; // No instance buffer to load data
+			{
+				LOG_ERROR("load_instance_buffer: No VBO found for attrib_index %d", attrib_index);
+				return;
+			}
 
-			if(amount_in_attrib_size + data_offset_by_attrib_size > region->size_in_number)
-				return; // Trying to load more data than region size
+			if (amount_in_attrib_size + data_offset_by_attrib_size > region->size_in_number)
+			{
+				LOG_ERROR("load_instance_buffer: Data overflow! requested=%u offset=%u region_size=%u",
+					amount_in_attrib_size,
+					data_offset_by_attrib_size,
+					region->size_in_number);
+				return;
+			}
 
 			glBindBuffer(GL_ARRAY_BUFFER, attrib.VBO);
 			glBufferSubData(GL_ARRAY_BUFFER, (region->offset_in_numbers + data_offset_by_attrib_size) * attrib.attrib_size_bytes,
@@ -1134,14 +1156,18 @@ public:
 		}
 	}
 
-	//TODO: fix param
 	/// <summary>
 	///     Imports a 3D model from file using Assimp and builds the mesh hierarchy.
 	/// </summary>
 	/// <remarks>
-	///     Loads scene data, then processes the root node recursively into engine meshes.
+	///     Loads scene data, processes the root node recursively into engine meshes,
+	///     and stores the resulting model root inside the engine.
 	/// </remarks>
 	/// <param name="path">[in] File path of the model to import.</param>
+	/// <param name="flip_uvs">[in] Whether to flip UV coordinates during import.</param>
+	/// <returns>
+	///     Index of the imported model root, or -1 if loading fails.
+	/// </returns>
 	int import_model_from_file(std::string path, const bool flip_uvs = true)
 	{
 		const aiScene* scene = scene_importer.ReadFile(path, aiProcess_Triangulate 
