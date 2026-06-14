@@ -6,7 +6,7 @@
 
 class Event_manager
 {
-private:
+public:
     class Channel
     {
     private:
@@ -186,7 +186,8 @@ private:
                 running = false;
             }
             signal.notify_one();
-            worker.join();
+            if (worker.joinable())
+                worker.join();
         }
 
         /// <summary>
@@ -239,10 +240,9 @@ private:
         }
 
     };
-
+private:
     std::unordered_map<std::string, std::shared_ptr<Channel>> channels;
     std::mutex channels_mutex;
-
 public:
 
     /// <summary>
@@ -278,6 +278,28 @@ public:
         channels.erase(it);
     }
 
+    //TODO:add param
+    std::vector<std::string> get_all_channel_names()
+    {
+        std::lock_guard<std::mutex> lock(channels_mutex);
+        std::vector<std::string> names;
+        names.reserve(channels.size());
+        for (const auto& kv : channels)
+            names.push_back(kv.first);
+        return names;
+    }
+
+    //TODO: add param
+    std::weak_ptr<Channel> get_channel(const std::string& name)
+    {
+        std::lock_guard<std::mutex> lock(channels_mutex);
+        const auto it = channels.find(name);
+        if (it == channels.end())
+            return std::weak_ptr<Channel>();
+        return std::weak_ptr<Channel>(it->second);
+    }
+
+
     /// <summary>
     ///     Subscribes a receiver to a specific event type within a channel.
     /// </summary>
@@ -296,6 +318,8 @@ public:
         it->second->subscribe(event_type, receiver);
     }
 
+
+    //TODO: this will now probibly log lots of errors becouse layes will try to throw event in others without caring if they have the channel or not
     /// <summary>
     ///     Throws an event into a specific channel for processing.
     /// </summary>

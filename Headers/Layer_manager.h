@@ -1,5 +1,6 @@
 #pragma once
 #include <Globals.h>
+#include "The_event_manager.h"
 
 class Layer_manager;
 
@@ -9,13 +10,14 @@ protected:
     std::string Layer_name = "Layer";
     Layer_manager* layer_manager = nullptr;
     bool is_blocking_events = false;
+    Event_manager event_manager;
 
 public:
-    int layer_index = 0;
+    int layer_index = -1;
 
-    Layer(const std::string& name = "Layer");
-	: Layer_name(name)
-    }
+    Layer(const std::string& name = "Layer")
+	    : Layer_name(name)
+    {}
 
     virtual ~Layer() = default;
 
@@ -24,7 +26,15 @@ public:
     virtual void Update() = 0;
     virtual void Render() = 0;
 
-    //virtual bool onEvent(Event_management::Event& event) = 0;
+    void Throw_event(const std::string channel_name ,std::unique_ptr<Event_management::Event> event)
+    {
+        event_manager.throw_event(channel_name, std::move(event));
+    }
+
+    Event_manager* get_event_manager()
+    {
+        return &event_manager;
+    }
 
     const std::string& get_name() const
     {
@@ -56,10 +66,21 @@ public:
 class Layer_manager
 {
 private:
-    std::vector<std::unique_ptr<Layer>> layers;
 
+    std::vector<std::unique_ptr<Layer>> layers;
+    std::vector<std::string> mandatory_channels;
 public:
-    int try_add_layer(std::unique_ptr<Layer> layer, unsigned int layer_index = -1)
+    bool add_mandatory_channel(const std::string& channel_name)
+    {
+        auto it = std::find(mandatory_channels.begin(), mandatory_channels.end(), channel_name);
+        if (it != mandatory_channels.end())
+            return false;
+        mandatory_channels.push_back(channel_name);
+        rewire_event_managers();
+        return true;
+    }
+
+    int try_add_layer(std::unique_ptr<Layer> layer, int layer_index = -1)
     {
         if (!layer)
             return -1;
@@ -70,40 +91,45 @@ public:
                 return -1;
         }
 
-        if(layer_index < 0 || layer_index > layers.size())
-			layer_index = layers.size();
+        if (layer_index < 0 || layer_index > layers.size())
+            layer_index = layers.size();
 
         layer->set_layer_manager(this);
-		layer->layer_index = layer_index;
+        layer->layer_index = layer_index;
 
-        for(int i = layer_index; i < layers.size(); i++)
+        for (int i = layer_index; i < layers.size(); i++)
         {
             layers[i]->layer_index++;
-		}
+        }
 
-        layers.push_back(std::move(layer));
         layer->onAttach();
+        layers.insert(layers.begin() + layer_index, std::move(layer));
+        
+        rewire_event_managers(layer_index-1,layer_index+1);
 
-        return layer->layer_index;
+        return layer_index;
     }
 
     void remove_layer(const std::string& name)
     {
-		bool found = false;
+        int found_index = -1;
 
-        for(int i = 0; i < layers.size(); i++)
+        for (int i = 0; i < layers.size(); i++)
         {
-            if (found)
+            if (found_index>=0)
             {
                 layers[i]->layer_index--;
             }
-            else if(layers[i]->get_name() == name)
+            else if (layers[i]->get_name() == name)
             {
                 layers[i]->onDetach();
                 layers.erase(layers.begin() + i);
-                found = true;
+                found_index = i;
                 i--;
-			}
+            }
+        }
+
+        rewire_event_managers(found_index - 1, found_index + 1);
     }
 
     Layer* get_layer(const std::string& name) const
@@ -126,17 +152,30 @@ public:
         return layers.size();
     }
 
-    bool dispatch_event(Event_management::Event& event)
+    bool throw_event_at(const std::string& channel_name, std::unique_ptr<Event_management::Event> event, int layer_index)
     {
-        for (auto it = layers.rbegin(); it != layers.rend(); ++it)
-        {
-            if ((*it)->onEvent(event))
-                return true;
+        if (layer_index < 0 || layer_index >= layers.size())
+            return false;
 
-            if ((*it)->is_blocking())
-                return false;
-        }
-        return false;
+        if (layers[layer_index]->is_blocking())
+            return false;
+
+        layers[layer_index]->Throw_event(channel_name, std::move(event));
+        return true;
+    }
+
+    bool throw_event_at(const std::string& channel_name, std::unique_ptr<Event_management::Event> event, std::string name)
+    {
+        Layer* ptr = get_layer(name);
+
+        if (ptr == nullptr)
+            return false;
+
+        if (ptr->is_blocking())
+            return false;
+
+        ptr->Throw_event(channel_name, std::move(event));
+        return true;
     }
 
     void update_all_layers()
@@ -162,6 +201,50 @@ public:
             (*it)->onDetach();
         }
         layers.clear();
-        next_z_order = 0;
+    }
+
+    void add_mandatory_channels()
+    {
+        for(auto &layer : layers)
+        {
+            for (std::string name : mandatory_channels)
+            {
+                if (layer->get_event_manager()->get_channel(name) != nullptr)
+                    layer->get_event_manager()->create_channel(name);
+            }
+            
+        }
+    }
+
+    void rewire_event_managers(unsigned int start_index = 0, unsigned int end_index = 0)
+    {
+        if (end_index <= 0 || end_index >= layers.size())
+            end_index = layers.size() - 1;
+
+        if (start_index > end_index)
+            return;
+
+        add_mandatory_channels();
+
+        //it is importand it is i < end and not i <= end, becouse we dont need to add downstream for last layer 
+        //and also it will couse out of range error
+        for(int i = start_index; i < end_index; i++)
+        {
+            std::vector<std::string> names = layers[i]->get_event_manager()->get_all_channel_names();
+            for(std::string name : names)
+            {
+                layers[i]->get_event_manager()->connect(name, layers[i]->get_event_manager()->get_channel(name));
+            }
+        }
+
+        if (end_index >= layers.size() - 1)
+        {
+            std::vector<std::string> names = layers[end_index]->get_event_manager()->get_all_channel_names();
+            for (std::string name : names)
+            {
+                layers[end_index]->get_event_manager()->connect(name, nullptr);
+            }
+        }
+        
     }
 };
