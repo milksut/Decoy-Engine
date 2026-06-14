@@ -26,12 +26,15 @@ public:
 
     double mouse_x = 0, mouse_y = 0, mouse_sensitivity = 1;  
 
-    //TODO:fix params
     /// <summary>
-    ///     Initializes the input manager, sets up event channels and registers GLFW input callbacks. Width and height only used for starting mouse position.
+    ///     Initializes the input manager and creates default input channels.
     /// </summary>
-    /// <param name="event_manager">[in] Reference to the event manager used for input events.</param>
-    /// <param name="window">[in] Pointer to the GLFW window used for input callbacks.</param>
+    /// <remarks>
+    ///     Validates GLFW window user pointer and registers all predefined input channels
+    ///     in the event manager.
+    /// </remarks>
+    /// <param name="event_manager_in">[in] Reference to the event manager used for input events.</param>
+    /// <param name="window_in">[in] Pointer to the GLFW window used for input callbacks.</param>
     Input_Manager(Event_manager& event_manager_in, GLFWwindow* window_in)
         : event_manager(event_manager_in), window(window_in)
     {
