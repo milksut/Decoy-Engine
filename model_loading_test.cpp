@@ -1,5 +1,5 @@
-#include "App.h"
-#include "GameLayer.h"
+#include "Layers/App.h"
+#include "Layers/GameLayer.h"
 
 int main()
 {

@@ -10,7 +10,8 @@ struct Transform_component
     glm::vec3 rotation = glm::vec3(0.0);
     glm::vec3 scale = glm::vec3(1.0);
 
-    //only used by animation ondefault for now
+    //TODO: make quat rotation default one
+    //only used by animation on default for now
     glm::quat rotation_quat = glm::identity<glm::quat>();
     bool use_quat = false;
     
