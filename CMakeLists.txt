@@ -26,7 +26,7 @@ else()
 endif()
 
 # Use after downloading dependencies to prevent checking each time
-set(FETCHCONTENT_FULLY_DISCONNECTED ON)
+# set(FETCHCONTENT_FULLY_DISCONNECTED ON)
 
 include(FetchContent)
 
@@ -100,6 +100,28 @@ FetchContent_MakeAvailable(stb)
 
 add_library(stb INTERFACE)
 target_include_directories(stb INTERFACE ${stb_SOURCE_DIR})
+
+# --- Jolt Physics ---
+FetchContent_Declare(
+  jolt
+  GIT_REPOSITORY https://github.com/jrouwe/JoltPhysics.git
+  GIT_TAG v0.11.0 # Example stable tag
+)
+set(JOLT_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+set(JOLT_BUILD_EXAMPLES OFF CACHE BOOL ""  FORCE)
+FetchContent_MakeAvailable(jolt)
+
+# --- OpenAL Soft ---
+FetchContent_Declare(
+  openal
+  GIT_REPOSITORY https://github.com/kcat/openal-soft.git
+  GIT_TAG 1.23.1 # Example stable release
+)
+set(ALSOFT_EXAMPLES OFF CACHE BOOL "" FORCE)
+set(ALSOFT_TESTS OFF CACHE BOOL "" FORCE)
+set(ALSOFT_INSTALL OFF CACHE BOOL "" FORCE)
+FetchContent_MakeAvailable(openal)
+
 # -------------------------------------------------------------------
 # 3. YOUR FILES
 # -------------------------------------------------------------------
@@ -122,6 +144,8 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
     assimp::assimp
     stb
     entt
+    Jolt
+    OpenAL::OpenAL
 )
 
 target_include_directories(${PROJECT_NAME} SYSTEM PRIVATE
