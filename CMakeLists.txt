@@ -1,4 +1,4 @@
-﻿cmake_minimum_required (VERSION 3.15)
+﻿cmake_minimum_required (VERSION 3.20)
 set(CMAKE_POLICY_VERSION_MINIMUM 3.5)
 project ("Decoy_Engine")
 
@@ -102,14 +102,18 @@ add_library(stb INTERFACE)
 target_include_directories(stb INTERFACE ${stb_SOURCE_DIR})
 
 # --- Jolt Physics ---
+set(DOUBLE_PRECISION ON)
+set(CROSS_PLATFORM_DETERMINISTIC OFF)
+
 FetchContent_Declare(
-  jolt
+  JoltPhysics
   GIT_REPOSITORY https://github.com/jrouwe/JoltPhysics.git
   GIT_TAG v5.5.0
+  SOURCE_SUBDIR "Build"
 )
 set(JOLT_BUILD_TESTS OFF CACHE BOOL "" FORCE)
 set(JOLT_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
-FetchContent_MakeAvailable(jolt)
+FetchContent_MakeAvailable(JoltPhysics)
 
 # --- OpenAL Soft ---
 FetchContent_Declare(
