@@ -105,21 +105,21 @@ target_include_directories(stb INTERFACE ${stb_SOURCE_DIR})
 FetchContent_Declare(
   jolt
   GIT_REPOSITORY https://github.com/jrouwe/JoltPhysics.git
-  GIT_TAG v0.11.0 # Example stable tag
+  GIT_TAG v5.5.0
 )
 set(JOLT_BUILD_TESTS OFF CACHE BOOL "" FORCE)
-set(JOLT_BUILD_EXAMPLES OFF CACHE BOOL ""  FORCE)
+set(JOLT_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
 FetchContent_MakeAvailable(jolt)
 
 # --- OpenAL Soft ---
 FetchContent_Declare(
   openal
   GIT_REPOSITORY https://github.com/kcat/openal-soft.git
-  GIT_TAG 1.23.1 # Example stable release
+  GIT_TAG 1.25.2
 )
 set(ALSOFT_EXAMPLES OFF CACHE BOOL "" FORCE)
-set(ALSOFT_TESTS OFF CACHE BOOL "" FORCE)
-set(ALSOFT_INSTALL OFF CACHE BOOL "" FORCE)
+set(ALSOFT_TESTS    OFF CACHE BOOL "" FORCE)
+set(ALSOFT_INSTALL  OFF CACHE BOOL "" FORCE)
 FetchContent_MakeAvailable(openal)
 
 # -------------------------------------------------------------------
