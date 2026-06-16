@@ -16,6 +16,10 @@ https://trello.com/b/GilFUyxB/decoyengine
 
 - EnTT -> Entity component system
 
+- Jolt -> Fizik motoru
+
+- OpelAL -> ses motoru
+
 - X11 -> Linux kullanıcılarının kurması gerekiyor
 
 - After the initial download take out of the comment this line in CMakelists.txt
