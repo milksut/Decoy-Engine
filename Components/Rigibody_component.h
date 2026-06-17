@@ -5,11 +5,13 @@
 struct RigidBody_component
 {
     JPH::BodyID body_id;
-    bool        is_static = false;
+    bool is_trigger = false;
+    bool is_static = false;
 
-    RigidBody_component() = default;
-    RigidBody_component(JPH::BodyID id, bool static_body = false)
-        : body_id(id), is_static(static_body)
+    //TODO:add evenet reciver for selected object
+
+    RigidBody_component(const JPH::BodyID id, const bool is_static_in = false, const bool is_trigger_in = false)
+        : body_id(id), is_static(is_static_in), is_trigger(is_trigger_in)
     {
     }
 };

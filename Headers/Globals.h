@@ -1103,6 +1103,15 @@ namespace Event_management
 		Window_focused, Window_unfocused, Window_iconified, Window_uniconified,
 		Window_maximized, Window_restored, Window_moved, Window_content_scaled, Window_refresh,
 
+		// Physics commands
+		Physics_create_body, Physics_remove_body,
+		Physics_apply_force, Physics_apply_impulse,
+		Physics_set_velocity, Physics_set_gravity,
+
+		//Physics notifications
+		Physics_collision_begin, Physics_collision_end,
+		Physics_trigger_enter, Physics_trigger_exit,
+
 
 		LAST_EVENT_TYPE//always leave in bottom. Used to measure how many event types there are
 	};

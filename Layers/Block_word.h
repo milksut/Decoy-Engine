@@ -175,9 +175,9 @@ public:
     };
 
     // -------------------------------------------------------------------
-    // Raycast — Jolt'tan gelen BodyID ile ters haritadan blok bulunur.
-    // Normal hesabý: çarpma noktasý ile blok merkezi arasýndaki farkýn
-    // dominant ekseni kullanýlýr; ama önce yüzey epsilon'u uygulanýr.
+    // Raycast ï¿½ Jolt'tan gelen BodyID ile ters haritadan blok bulunur.
+    // Normal hesabï¿½: ï¿½arpma noktasï¿½ ile blok merkezi arasï¿½ndaki farkï¿½n
+    // dominant ekseni kullanï¿½lï¿½r; ama ï¿½nce yï¿½zey epsilon'u uygulanï¿½r.
     // -------------------------------------------------------------------
     std::optional<RayHit> raycast(const glm::vec3& origin, const glm::vec3& dir, float max_dist = 10.0f, JPH::BodyID skip_body_id = JPH::BodyID())
     {
