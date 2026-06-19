@@ -81,9 +81,10 @@ public:
         m_world = std::make_unique<BlockWorld<Block>>(global_registry, m_physics.get());
 
         m_block_model = std::make_unique<game_object_basic_model>();
-        m_block_model->import_model_from_file("Models\\cube.obj");
+        m_block_model->import_model_from_file("Models\\Imported\\Grass_Block.obj", false);
         m_block_model->add_instance_buffer(16, MODEL_ATRIB_LAST_INDEX + 1);
         m_block_model->add_instance_buffer(9, MODEL_ATRIB_LAST_INDEX + 5);
+
         Block::set_model(m_block_model.get(), 4096);
 
         generate_flat_world(25, 25);
