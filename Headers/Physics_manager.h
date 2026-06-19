@@ -1,8 +1,11 @@
 #pragma once
 #include "Globals.h"
 #include "The_event_manager.h"
+#include "Events/Physics_events.h"
+#include "game_object_basic.h"
+
 #include "Components/Transform_components.h"
-#include "Components/Rigibody_component.h"
+#include "Components/Rigidbody_component.h"
 
 #include <Jolt/Jolt.h>
 #include <Jolt/RegisterTypes.h>
@@ -14,9 +17,14 @@
 #include <Jolt/Physics/Collision/RayCast.h>
 #include <Jolt/Physics/Collision/CastResult.h>
 #include <Jolt/Physics/Collision/CollisionCollectorImpl.h>
+#include <Jolt/Physics/Collision/ContactListener.h>
+
+#include <Jolt/Physics/Body/BodyCreationSettings.h>
+#include <Jolt/Physics/Collision/Shape/BoxShape.h>
+#include <Jolt/Physics/Collision/Shape/SphereShape.h>
+#include <Jolt/Physics/Collision/Shape/CapsuleShape.h>
 
 //TODO:add param, logs
-//TODO: integrate events
 
 // Layer that objects can be in, determines which other objects it can collide with
 // Typically you at least want to have 1 layer for moving bodies and 1 layer for static bodies, but you can have more
@@ -123,27 +131,381 @@ private:
 
     std::unique_ptr<JPH::TempAllocatorImpl>    temp_allocator = nullptr;
     std::unique_ptr<JPH::JobSystemThreadPool>  job_system = nullptr;
-    std::unique_ptr<JPH::PhysicsSystem>        physics_system = nullptr;
+    std::unique_ptr<JPH::PhysicsSystem>        physics_system = nullptr; 
 
-    //TODO: integrate events
     Event_manager* event_manager = nullptr;
+    entt::registry* registry = nullptr;
+
+
+    Event_management::Event_receiver_shared event_reciver = Event_management::make_receiver([this](const Event_management::Event& e)
+    {
+
+        if (e.type == Event_management::Event_type::Physics_apply_force)
+        {
+            const auto& force_ev = static_cast<const Apply_force_event&>(e);
+            add_force(force_ev.body_id, force_ev.force);
+        }
+        else if (e.type == Event_management::Event_type::Physics_apply_impulse)
+        {
+            const auto& impulse_ev = static_cast<const Apply_impulse_event&>(e);
+            add_impulse(impulse_ev.body_id, impulse_ev.impulse);
+        }
+        else if(e.type == Event_management::Event_type::Physics_set_velocity)
+        {
+            const auto& velocity_ev = static_cast<const Set_velocity_event&>(e);
+            set_linear_velocity(velocity_ev.body_id, velocity_ev.velocity);
+        }
+        else if(e.type == Event_management::Event_type::Physics_set_gravity)
+        {
+            const auto& garvity_ev = static_cast<const Set_gravity_event&>(e);
+            set_gravity(garvity_ev.gravity);
+        }
+    });
+
+    class Physics_contact_listener : public JPH::ContactListener
+    {
+        Event_manager* event_manager;
+        entt::registry* registry;
+        JPH::PhysicsSystem* physics_system;
+
+        // Reads object id directly from body's UserData
+        unsigned int entity_id_from_body(const JPH::Body& body) const
+        {
+            return static_cast<unsigned int>(body.GetUserData()); 
+        }
+
+        // For OnContactRemoved — only has BodyID, needs a lock to read body
+        unsigned int entity_id_from_body_id(const JPH::BodyID id) const
+        {
+            JPH::BodyLockRead lock(physics_system->GetBodyLockInterface(), id);
+
+            if (!lock.Succeeded())
+                return 0;
+
+            return entity_id_from_body(lock.GetBody());
+        }
+
+        // Gets the event_reciver from a RigidBody_component, returns nullptr if missing
+        RigidBody_component* get_rigid_body_comp(unsigned int object_id) const
+        {
+            if (object_id == 0)
+                return nullptr;
+
+            game_object_base* obj = Global_object_map::get_object(object_id);
+
+            if (obj == nullptr)
+                return nullptr;
+
+            RigidBody_component* rb = obj->get_component<RigidBody_component>();
+
+            return rb;
+        }
+
+        bool is_trigger_pair(unsigned int e1_id , unsigned int e2_id) const
+        {
+            RigidBody_component* e1_body = get_rigid_body_comp(e1_id);
+            RigidBody_component* e2_body = get_rigid_body_comp(e2_id);
+
+            bool e1_trigger = e1_body != nullptr ? e1_body->is_trigger : false;
+            bool e2_trigger = e2_body != nullptr ? e2_body->is_trigger : false;
+
+            return e1_trigger || e2_trigger;
+        }
+
+    public:
+        Physics_contact_listener(Event_manager* em, entt::registry* reg, JPH::PhysicsSystem* ps)
+            : event_manager(em), registry(reg), physics_system(ps)
+        {}
+
+        JPH::ValidateResult OnContactValidate(const JPH::Body&, const JPH::Body&, JPH::RVec3Arg, const JPH::CollideShapeResult&) override
+        {
+            return JPH::ValidateResult::AcceptAllContactsForThisBodyPair;
+        }
+
+        void OnContactAdded(const JPH::Body& b1, const JPH::Body& b2,
+            const JPH::ContactManifold& manifold, JPH::ContactSettings&) override
+        {
+            unsigned int e1 = entity_id_from_body(b1);
+            unsigned int e2 = entity_id_from_body(b2);
+            bool trigger = is_trigger_pair(e1, e2);
+
+            JPH::RVec3 jpt = manifold.GetWorldSpaceContactPointOn1(0);
+            glm::vec3  pt(jpt.GetX(), jpt.GetY(), jpt.GetZ());
+
+            RigidBody_component* e1_body = get_rigid_body_comp(e1);
+
+            // Notify body A — "I hit B"
+            if (e1_body != nullptr)
+            {
+                Event_management::Event_receiver_shared recv = e1_body->event_reciver;
+                if (recv != nullptr)
+                {
+                    if (trigger)
+                    {
+                        event_manager->throw_event(Physics_manager::CHANNEL_NAME,
+                            std::make_unique<Trigger_enter_event>(e1, e2, pt,
+                                Event_management::Event_timing::Queued, recv));
+                    }
+                    else
+                    {
+                        event_manager->throw_event(Physics_manager::CHANNEL_NAME,
+                            std::make_unique<Collision_begin_event>(e1, e2, pt,
+                                Event_management::Event_timing::Queued, recv));
+                    }
+                        
+                }
+                else //Throw a annauncment event rather than a targeted one
+                {
+                    if (trigger)
+                    {
+                        event_manager->throw_event(Physics_manager::CHANNEL_NAME,
+                            std::make_unique<Trigger_enter_event>(e1, e2, pt,
+                                Event_management::Event_timing::Queued));
+                    }
+                    else
+                    {
+                        event_manager->throw_event(Physics_manager::CHANNEL_NAME,
+                            std::make_unique<Collision_begin_event>(e1, e2, pt,
+                                Event_management::Event_timing::Queued));
+                    }
+                }
+            }
+           
+
+            // Notify body B — "I hit A"
+            RigidBody_component* e2_body = get_rigid_body_comp(e2);
+            if (e2_body != nullptr)
+            {
+                Event_management::Event_receiver_shared recv = e2_body->event_reciver;
+                if (recv != nullptr)
+                {
+                    if (trigger)
+                    {
+                        event_manager->throw_event(Physics_manager::CHANNEL_NAME,
+                            std::make_unique<Trigger_enter_event>(e2, e1, pt,
+                                Event_management::Event_timing::Queued, recv));
+                    }
+                    else
+                    {
+                        event_manager->throw_event(Physics_manager::CHANNEL_NAME,
+                            std::make_unique<Collision_begin_event>(e2, e1, pt,
+                                Event_management::Event_timing::Queued, recv));
+                    }
+
+                }
+                else //Throw a annauncment event rather than a targeted one
+                {
+                    if (trigger)
+                    {
+                        event_manager->throw_event(Physics_manager::CHANNEL_NAME,
+                            std::make_unique<Trigger_enter_event>(e2, e1, pt,
+                                Event_management::Event_timing::Queued));
+                    }
+                    else
+                    {
+                        event_manager->throw_event(Physics_manager::CHANNEL_NAME,
+                            std::make_unique<Collision_begin_event>(e2, e1, pt,
+                                Event_management::Event_timing::Queued));
+                    }
+                }
+            }
+        }
+
+        void OnContactRemoved(const JPH::SubShapeIDPair& pair) override
+        {
+            JPH::BodyID b1 = pair.GetBody1ID();
+            JPH::BodyID b2 = pair.GetBody2ID();
+
+            unsigned int e1 = entity_id_from_body_id(b1);
+            unsigned int e2 = entity_id_from_body_id(b2);
+            bool trigger = is_trigger_pair(e1, e2);
+
+            RigidBody_component* e1_body = get_rigid_body_comp(e1);
+
+            // Notify body A — "I hit B"
+            if (e1_body != nullptr)
+            {
+                Event_management::Event_receiver_shared recv = e1_body->event_reciver;
+                if (recv != nullptr)
+                {
+                    if (trigger)
+                    {
+                        event_manager->throw_event(Physics_manager::CHANNEL_NAME,
+                            std::make_unique<Trigger_exit_event>(e1, e2,
+                                Event_management::Event_timing::Queued, recv));
+                    }
+                    else
+                    {
+                        event_manager->throw_event(Physics_manager::CHANNEL_NAME,
+                            std::make_unique<Collision_end_event>(e1, e2,
+                                Event_management::Event_timing::Queued, recv));
+                    }
+
+                }
+                else //Throw a annauncment event rather than a targeted one
+                {
+                    if (trigger)
+                    {
+                        event_manager->throw_event(Physics_manager::CHANNEL_NAME,
+                            std::make_unique<Trigger_exit_event>(e1, e2,
+                                Event_management::Event_timing::Queued));
+                    }
+                    else
+                    {
+                        event_manager->throw_event(Physics_manager::CHANNEL_NAME,
+                            std::make_unique<Collision_end_event>(e1, e2,
+                                Event_management::Event_timing::Queued));
+                    }
+                }
+            }
+
+
+            // Notify body B — "I hit A"
+            RigidBody_component* e2_body = get_rigid_body_comp(e2);
+            if (e2_body != nullptr)
+            {
+                Event_management::Event_receiver_shared recv = e2_body->event_reciver;
+                if (recv != nullptr)
+                {
+                    if (trigger)
+                    {
+                        event_manager->throw_event(Physics_manager::CHANNEL_NAME,
+                            std::make_unique<Trigger_exit_event>(e2, e1,
+                                Event_management::Event_timing::Queued, recv));
+                    }
+                    else
+                    {
+                        event_manager->throw_event(Physics_manager::CHANNEL_NAME,
+                            std::make_unique<Collision_end_event>(e2, e1,
+                                Event_management::Event_timing::Queued, recv));
+                    }
+
+                }
+                else //Throw a annauncment event rather than a targeted one
+                {
+                    if (trigger)
+                    {
+                        event_manager->throw_event(Physics_manager::CHANNEL_NAME,
+                            std::make_unique<Trigger_exit_event>(e2, e1,
+                                Event_management::Event_timing::Queued));
+                    }
+                    else
+                    {
+                        event_manager->throw_event(Physics_manager::CHANNEL_NAME,
+                            std::make_unique<Collision_end_event>(e2, e1,
+                                Event_management::Event_timing::Queued));
+                    }
+                }
+            }
+        }
+
+        void OnContactPersisted(const JPH::Body& b1, const JPH::Body& b2,
+            const JPH::ContactManifold& manifold, JPH::ContactSettings&) override
+        {
+            unsigned int e1 = entity_id_from_body(b1);
+            unsigned int e2 = entity_id_from_body(b2);
+            bool trigger = is_trigger_pair(e1, e2);
+
+            JPH::RVec3 jpt = manifold.GetWorldSpaceContactPointOn1(0);
+            glm::vec3  pt(jpt.GetX(), jpt.GetY(), jpt.GetZ());
+
+            RigidBody_component* e1_body = get_rigid_body_comp(e1);
+
+            // Notify body A — "I hit B"
+            if (e1_body != nullptr)
+            {
+                Event_management::Event_receiver_shared recv = e1_body->event_reciver;
+                if (recv != nullptr)
+                {
+                    if (trigger)
+                    {
+                        event_manager->throw_event(Physics_manager::CHANNEL_NAME,
+                            std::make_unique<Trigger_persisted_event>(e1, e2, pt,
+                                Event_management::Event_timing::Queued, recv));
+                    }
+                    else
+                    {
+                        event_manager->throw_event(Physics_manager::CHANNEL_NAME,
+                            std::make_unique<Collision_persisted_event>(e1, e2, pt,
+                                Event_management::Event_timing::Queued, recv));
+                    }
+
+                }
+                else //Throw a annauncment event rather than a targeted one
+                {
+                    if (trigger)
+                    {
+                        event_manager->throw_event(Physics_manager::CHANNEL_NAME,
+                            std::make_unique<Trigger_persisted_event>(e1, e2, pt,
+                                Event_management::Event_timing::Queued));
+                    }
+                    else
+                    {
+                        event_manager->throw_event(Physics_manager::CHANNEL_NAME,
+                            std::make_unique<Collision_persisted_event>(e1, e2, pt,
+                                Event_management::Event_timing::Queued));
+                    }
+                }
+            }
+
+
+            // Notify body B — "I hit A"
+            RigidBody_component* e2_body = get_rigid_body_comp(e2);
+            if (e2_body != nullptr)
+            {
+                Event_management::Event_receiver_shared recv = e2_body->event_reciver;
+                if (recv != nullptr)
+                {
+                    if (trigger)
+                    {
+                        event_manager->throw_event(Physics_manager::CHANNEL_NAME,
+                            std::make_unique<Trigger_persisted_event>(e2, e1, pt,
+                                Event_management::Event_timing::Queued, recv));
+                    }
+                    else
+                    {
+                        event_manager->throw_event(Physics_manager::CHANNEL_NAME,
+                            std::make_unique<Collision_persisted_event>(e2, e1, pt,
+                                Event_management::Event_timing::Queued, recv));
+                    }
+
+                }
+                else //Throw a annauncment event rather than a targeted one
+                {
+                    if (trigger)
+                    {
+                        event_manager->throw_event(Physics_manager::CHANNEL_NAME,
+                            std::make_unique<Trigger_persisted_event>(e2, e1, pt,
+                                Event_management::Event_timing::Queued));
+                    }
+                    else
+                    {
+                        event_manager->throw_event(Physics_manager::CHANNEL_NAME,
+                            std::make_unique<Collision_persisted_event>(e2, e1, pt,
+                                Event_management::Event_timing::Queued));
+                    }
+                }
+            }
+        }
+    };
+
+    std::unique_ptr<Physics_contact_listener> contact_listener;
 
 public:
+    static constexpr const char* CHANNEL_NAME = "physics";
 
-    void SyncPhysicsToECS(entt::registry& registry)
+    void SyncPhysicsToECS()
     {
-        if (physics_system == nullptr)
+        if (physics_system == nullptr || registry == nullptr)
             return;
 
-        auto view = registry.view<RigidBody_component, Transform_component>();
+        auto view = registry->view<RigidBody_component, Transform_component, Id_component>();
         JPH::BodyInterface& bi = physics_system->GetBodyInterface();
 
-        for (auto entity : view)
+        view.each([&](entt::entity /*entity*/, RigidBody_component& rb, Transform_component& tf, Id_component& id_comp)
         {
-            auto& rb = view.get<RigidBody_component>(entity);
-            auto& tf = view.get<Transform_component>(entity);
-
-            if (!bi.IsActive(rb.body_id)) continue; // skip sleeping bodies
+            if (!bi.IsActive(rb.body_id))
+                return; // skip sleeping bodies
 
             JPH::RVec3 pos = bi.GetCenterOfMassPosition(rb.body_id);
             JPH::Quat  rot = bi.GetRotation(rb.body_id);
@@ -155,12 +517,17 @@ public:
             //becouse euler returns radians ZYX
             tf.rotation = glm::degrees(glm::eulerAngles(tf.rotation_quat));
             std::swap(tf.rotation.x, tf.rotation.z);
-        }
+
+            // tell the hierarchy the transform changed
+            game_object_base* obj = Global_object_map::get_object(id_comp.id);
+            if (obj != nullptr)
+                obj->trigger_pos_changed_flags();
+
+        });
     }
 
-    //TODO: event manager connection
-    Physics_manager(Event_manager* event_manager_in)
-        : event_manager(event_manager_in)
+    Physics_manager(Event_manager* event_manager_in, entt::registry* registry_in)
+        : event_manager(event_manager_in), registry(registry_in)
     {
         // must be FIRST
         JPH::RegisterDefaultAllocator();
@@ -180,13 +547,36 @@ public:
             Bp_layer_interface, O_vs_BP_filter, O_layer_filter);
 
         set_gravity(gravity);
+
+        if(event_manager != nullptr)
+        {
+            event_manager->create_channel(CHANNEL_NAME);
+
+            event_manager->subscribe(CHANNEL_NAME, Event_management::Event_type::Physics_apply_force, event_reciver);
+            event_manager->subscribe(CHANNEL_NAME, Event_management::Event_type::Physics_apply_impulse, event_reciver);
+            event_manager->subscribe(CHANNEL_NAME, Event_management::Event_type::Physics_set_velocity, event_reciver);
+            event_manager->subscribe(CHANNEL_NAME, Event_management::Event_type::Physics_set_gravity, event_reciver);
+
+            if(registry != nullptr)
+            {
+                contact_listener = std::make_unique<Physics_contact_listener>(
+                    event_manager, registry, physics_system.get());
+
+                physics_system->SetContactListener(contact_listener.get());
+            }
+        }
     }
 
     ~Physics_manager()
     {
+        physics_system->SetContactListener(nullptr);
+        contact_listener.reset();
+
         physics_system.reset();
         job_system.reset();
         temp_allocator.reset();
+
+        event_reciver.reset();
 
         JPH::UnregisterTypes();
         delete JPH::Factory::sInstance;
@@ -205,7 +595,6 @@ public:
         physics_system->SetGravity(gravity);
     }
 
-    //TODO: make body creating methods so dont need to release body_interface
     // use this to crate bodys
     JPH::BodyInterface* get_body_interface()
     {
@@ -215,7 +604,120 @@ public:
         return &(physics_system->GetBodyInterface());
     }
 
-    void Tick(float delta_time, entt::registry& registry)
+    //TODO: AI code - test and refactor - AI code start-------------------------------------------------------------
+    // Base version — full control, you set everything in BodyCreationSettings yourself
+    // Layer is auto-forced based on motion type so it can't mismatch
+    JPH::BodyID create_body(unsigned int object_id, JPH::BodyCreationSettings settings,
+        JPH::EActivation activation = JPH::EActivation::Activate)
+    {
+        if (physics_system == nullptr)
+            return JPH::BodyID(); // invalid ID
+
+        // force correct layer based on motion type — prevents layer/motiontype mismatch bugs
+        if (settings.mMotionType == JPH::EMotionType::Static)
+            settings.mObjectLayer = Object_layers::NON_MOVING;
+        else
+            settings.mObjectLayer = Object_layers::MOVING;
+
+        JPH::BodyInterface& bi = physics_system->GetBodyInterface();
+
+        JPH::Body* body = bi.CreateBody(settings);
+
+        if (body == nullptr)
+        {
+            LOG_ERROR("Physics_manager: CreateBody failed — body limit reached? (Max_bodies = %u)", Max_bodies);
+            return JPH::BodyID();
+        }
+
+        body->SetUserData(static_cast<uint64_t>(object_id));
+
+        bi.AddBody(body->GetID(), activation);
+
+        return body->GetID();
+    }
+
+    // Convenience — dynamic box
+    JPH::BodyID create_dynamic_box(unsigned int object_id,
+        JPH::Vec3 half_extents,
+        JPH::RVec3 position,
+        JPH::Quat rotation = JPH::Quat::sIdentity(),
+        float friction = 0.5f,
+        float restitution = 0.3f)
+    {
+        JPH::BodyCreationSettings settings(
+            new JPH::BoxShape(half_extents),
+            position, rotation,
+            JPH::EMotionType::Dynamic,
+            Object_layers::MOVING
+        );
+        settings.mFriction = friction;
+        settings.mRestitution = restitution;
+
+        return create_body(object_id, settings, JPH::EActivation::Activate);
+    }
+
+    // Convenience — dynamic sphere
+    JPH::BodyID create_dynamic_sphere(unsigned int object_id,
+        float radius,
+        JPH::RVec3 position,
+        JPH::Quat rotation = JPH::Quat::sIdentity(),
+        float friction = 0.5f,
+        float restitution = 0.3f)
+    {
+        JPH::BodyCreationSettings settings(
+            new JPH::SphereShape(radius),
+            position, rotation,
+            JPH::EMotionType::Dynamic,
+            Object_layers::MOVING
+        );
+        settings.mFriction = friction;
+        settings.mRestitution = restitution;
+
+        return create_body(object_id, settings, JPH::EActivation::Activate);
+    }
+
+    // Convenience — dynamic capsule (good default for characters/enemies)
+    JPH::BodyID create_dynamic_capsule(unsigned int object_id,
+        float half_height,
+        float radius,
+        JPH::RVec3 position,
+        JPH::Quat rotation = JPH::Quat::sIdentity(),
+        float friction = 0.5f,
+        float restitution = 0.0f)
+    {
+        JPH::BodyCreationSettings settings(
+            new JPH::CapsuleShape(half_height, radius),
+            position, rotation,
+            JPH::EMotionType::Dynamic,
+            Object_layers::MOVING
+        );
+        settings.mFriction = friction;
+        settings.mRestitution = restitution;
+
+        return create_body(object_id, settings, JPH::EActivation::Activate);
+    }
+
+    // Convenience — static box (floors, walls, terrain pieces)
+    JPH::BodyID create_static_box(unsigned int object_id,
+        JPH::Vec3 half_extents,
+        JPH::RVec3 position,
+        JPH::Quat rotation = JPH::Quat::sIdentity(),
+        float friction = 0.5f)
+    {
+        JPH::BodyCreationSettings settings(
+            new JPH::BoxShape(half_extents),
+            position, rotation,
+            JPH::EMotionType::Static,
+            Object_layers::NON_MOVING
+        );
+        settings.mFriction = friction;
+
+        return create_body(object_id, settings, JPH::EActivation::DontActivate);
+    }
+
+    //TODO: AI code - test and refactor - AI code end--------------------------------------------------------------
+
+    void Tick(float delta_time)
     {
         if (temp_allocator == nullptr || job_system == nullptr || physics_system == nullptr)
             return;
@@ -230,10 +732,9 @@ public:
             accumulator -= fixed_step;
         }
 
-        SyncPhysicsToECS(registry);
+        SyncPhysicsToECS();
     }
 
-    //TODO add safety checks to these
     bool cast_ray(const JPH::RRayCast ray, JPH::RayCastResult& hit, JPH::BroadPhaseLayerFilter bp_filter = {},
         JPH::ObjectLayerFilter ol_filter = {}, JPH::BodyFilter body_filter = {})
     {
@@ -324,3 +825,4 @@ public:
         physics_system->GetBodyInterface().DestroyBody(body_id);
     }
 };
+

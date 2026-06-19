@@ -89,7 +89,7 @@ public:
 
 	void Extract_bone_weight_for_vertices(std::vector<vertex_data>& vertices, aiMesh* mesh)
 	{
-		for (int boneIndex = 0; boneIndex < mesh->mNumBones; ++boneIndex)
+		for (unsigned int boneIndex = 0; boneIndex < mesh->mNumBones; ++boneIndex)
 		{
 			int boneID = -1;
 			std::string boneName = mesh->mBones[boneIndex]->mName.C_Str();
@@ -855,7 +855,6 @@ public:
 				{
 					Texture* texture;
 					aiString str;
-					bool is_embedded_texture = false;
 
 					//assimp_type - Texture type, j - Index of the texture to get, &str - output path
 					material->GetTexture(assimp_type, j, &str);

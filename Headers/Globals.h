@@ -1103,14 +1103,14 @@ namespace Event_management
 		Window_focused, Window_unfocused, Window_iconified, Window_uniconified,
 		Window_maximized, Window_restored, Window_moved, Window_content_scaled, Window_refresh,
 
-		// Physics commands
-		Physics_create_body, Physics_remove_body,
+		// Physics commands	
 		Physics_apply_force, Physics_apply_impulse,
 		Physics_set_velocity, Physics_set_gravity,
 
 		//Physics notifications
-		Physics_collision_begin, Physics_collision_end,
-		Physics_trigger_enter, Physics_trigger_exit,
+		Physics_body_crated, Physics_body_removed,
+		Physics_collision_begin, Physics_collision_persists, Physics_collision_end,
+		Physics_trigger_enter, Physics_trigger_persists, Physics_trigger_exit,
 
 
 		LAST_EVENT_TYPE//always leave in bottom. Used to measure how many event types there are
@@ -1172,8 +1172,12 @@ namespace Event_management
 		Event(const Event_timing event_timing, const Event_receiver_shared& target_receiver_in, const Event_type event_type)
 		{
 			this->timing = event_timing;
-			this->target_receiver = target_receiver_in;
-			this->scope = Event_scope::Targeted;
+			if (target_receiver_in != nullptr)
+			{
+				this->target_receiver = target_receiver_in;
+				this->scope = Event_scope::Targeted;
+			}
+			
 			this->type = event_type;
 		}
 

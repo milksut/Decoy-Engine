@@ -93,7 +93,7 @@ public:
         }
 
         if (layer_index < 0 || layer_index > layers.size())
-            layer_index = layers.size();
+            layer_index = (int)(layers.size());
 
         layer->set_layer_manager(this);
         layer->layer_index = layer_index;

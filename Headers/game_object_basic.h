@@ -47,6 +47,12 @@ public:
 
 	virtual int swap_region_index(int new_index) = 0;
 
+	template <typename Component_type>
+	Component_type* get_component() const
+	{
+		return registry.try_get<Component_type>(this_object);
+	}
+
 	/// <summary>
 	///     Updates all root transforms and uploads final transformation data.
 	/// </summary>
@@ -60,9 +66,9 @@ public:
 		auto view = registry_in.view<Transform_component, Id_component>(entt::exclude<Parent_component>);
 
 		view.each([](auto /*entity*/, Transform_component& /*transform*/, Id_component& id_comp)
-			{
-				Global_object_map::get_object(id_comp.id)->tick_transforms(glm::mat4(1.0f));
-			});
+		{
+			Global_object_map::get_object(id_comp.id)->tick_transforms(glm::mat4(1.0f));
+		});
 
 		upload_all_transforms();
 
@@ -78,6 +84,10 @@ public:
 	}
 
 protected:
+
+	entt::registry& registry;
+	entt::entity this_object;
+
 	/// <summary>
 	///     Returns a static registry of callable functions.
 	/// </summary>
@@ -126,9 +136,8 @@ protected:
 		return id_counter++;
 	}
 
-	game_object_base() = default;
-
-
+	game_object_base(entt::registry& registry_in)
+		: registry(registry_in) {}
 
 private:
 
@@ -255,7 +264,6 @@ private:
 	}
 
 	//-----------------------------------------------------------------------------------------
-	entt::registry& registry;
 
 	//used when we want a spesfic object to have its own class region rather than sharing with other objects of the same class,
 	//for example when we want to use asynch animations, we give each object its own region so that they can draw at differnt interwals rather than with instanced drawing
@@ -301,6 +309,7 @@ private:
 		return temp;
 	}
 
+	//TODO: retire this function to use more general get_component func (derived from base classs)
 	/// <summary>
 	///     Returns a reference to the entity's Transform_component.
 	/// </summary>
@@ -345,7 +354,6 @@ protected:
 	bool is_pos_changed_flag = false;
 	bool is_any_child_pos_changed_flag = false;
 
-	entt::entity this_object;
 	unsigned int id;
 
 	//TODO: renamke this to prevent miss use
@@ -527,7 +535,7 @@ protected:
 	/// <param name="transform">[in] Initial transform component.</param>
 	game_object_basic(entt::registry& registry_in, const std::string& tag = "Undefined tag", game_object_basic* parent_object = nullptr,
 		std::shared_ptr<class_region> special_region = nullptr, Transform_component transform = Transform_component())
-		: registry(registry_in), special_region(special_region)
+		: game_object_base(registry_in), special_region(special_region)
 	{
 		this_object = registry.create();
 
@@ -598,7 +606,7 @@ public:
 
 		if (active != nullptr)
 		{
-			if (region_slot_index >= 0 && region_slot_index <= active->size_in_number)
+			if (region_slot_index >= 0 && region_slot_index <= (int)active->size_in_number)
 			{
 				return region_slot_index;
 			}
@@ -663,6 +671,7 @@ public:
 		return id;
 	}
 
+	//TODO: retire this function to use more general get_component_copy func (derived from base class)
 	/// <summary>
 	///     Returns a copy of the object's Transform_component.
 	/// </summary>
@@ -1102,7 +1111,6 @@ public:
 
 		set_should_upload_flag(true);
 	}
-
 };
 
 namespace Global_object_map

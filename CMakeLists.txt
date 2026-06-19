@@ -26,7 +26,7 @@ else()
 endif()
 
 # Use after downloading dependencies to prevent checking each time
-# set(FETCHCONTENT_FULLY_DISCONNECTED ON)
+set(FETCHCONTENT_FULLY_DISCONNECTED ON)
 
 include(FetchContent)
 

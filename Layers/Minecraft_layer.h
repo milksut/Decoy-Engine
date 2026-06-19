@@ -65,7 +65,7 @@ public:
         );
 
         // Fizik
-        m_physics = std::make_unique<Physics_manager>(nullptr);
+        m_physics = std::make_unique<Physics_manager>(nullptr, &global_registry);
 
         // BlockWorld
         m_world = std::make_unique<BlockWorld<Block>>(global_registry, m_physics.get());
@@ -112,8 +112,8 @@ public:
 
         game_object_base::Tick(global_registry);
 
-        process_input(dt);
-        m_physics->Tick(dt, global_registry);
+        process_input();
+        m_physics->Tick(dt);
         sync_camera_to_player();
 
         m_frame_count++;
@@ -280,7 +280,7 @@ private:
             Event_management::Event_type::Mouse_moved, m_mouse_move_receiver);
 
         // Sol klik = kir, sag klik = koy
-        // Event sistemi ile tek seferlik press yakalama — hold'a geçince tekrar tetiklenmez
+        // Event sistemi ile tek seferlik press yakalama ï¿½ hold'a geï¿½ince tekrar tetiklenmez
         m_mouse_click_receiver = Event_management::make_receiver(
             [this](const Event_management::Event& e)
             {
@@ -304,7 +304,7 @@ private:
     }
 
     // -----------------------------------------------------------------------
-    void process_input(float dt)
+    void process_input()
     {
         GLFWwindow* window = m_app.get_window().get_handle();
         JPH::BodyInterface* bi = m_physics->get_body_interface();
@@ -322,7 +322,7 @@ private:
         JPH::Vec3 cur_vel = bi->GetLinearVelocity(m_player_body);
         bi->SetLinearVelocity(m_player_body, JPH::Vec3(move.x, cur_vel.GetY(), move.z));
 
-        // Ziplama — yerde olup olmadigini kontrol et
+        // Ziplama ï¿½ yerde olup olmadigini kontrol et
         // Oyuncunun altina kisa bir ray at, yere yakin mi bak
         bool on_ground = false;
         {
@@ -365,7 +365,7 @@ private:
 
         // ---------------------------------------------------------------
         // Sol klik: blok kir
-        // Flag update'den once temizlenir — ayni frame'de iki islem olmaz
+        // Flag update'den once temizlenir ï¿½ ayni frame'de iki islem olmaz
         // ---------------------------------------------------------------
         if (m_left_clicked)
         {
@@ -389,7 +389,7 @@ private:
         }
 
         // ---------------------------------------------------------------
-        // Sag klik: blok koy — blok yerlestirilecek pozisyon = hit blogu + normal
+        // Sag klik: blok koy ï¿½ blok yerlestirilecek pozisyon = hit blogu + normal
         // ---------------------------------------------------------------
         if (m_right_clicked)
         {
