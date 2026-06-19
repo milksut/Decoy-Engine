@@ -278,7 +278,10 @@ public:
         channels.erase(it);
     }
 
-    //TODO:add param
+    /// <summary>
+    ///     Returns the names of all registered event channels.
+    /// </summary>
+    /// <returns>Vector containing all channel names.</returns>
     std::vector<std::string> get_all_channel_names()
     {
         std::lock_guard<std::mutex> lock(channels_mutex);
@@ -289,7 +292,11 @@ public:
         return names;
     }
 
-    //TODO: add param
+    /// <summary>
+    ///     Retrieves an event channel by its name.
+    /// </summary>
+    /// <param name="name">[in] Name of the channel to retrieve.</param>
+    /// <returns>Weak pointer to the channel, or an empty weak pointer if not found.</returns>
     std::weak_ptr<Channel> get_channel(const std::string& name)
     {
         std::lock_guard<std::mutex> lock(channels_mutex);
