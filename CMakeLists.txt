@@ -134,7 +134,7 @@ FetchContent_MakeAvailable(openal)
 add_executable(${PROJECT_NAME} 
     "model_loading_test.cpp"
     "stb_setup.cpp"
-)
+ "Headers/Audio_manager.h")
 
 # -------------------------------------------------------------------
 # 4. LINKING & INCLUDES
@@ -150,6 +150,12 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
     entt
     Jolt
     OpenAL::OpenAL
+)
+
+add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+    $<TARGET_FILE:OpenAL::OpenAL>
+    $<TARGET_FILE_DIR:${PROJECT_NAME}>
 )
 
 target_include_directories(${PROJECT_NAME} SYSTEM PRIVATE

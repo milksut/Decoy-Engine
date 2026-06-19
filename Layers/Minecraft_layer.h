@@ -10,6 +10,7 @@
 #include "Shader.h"
 #include "UI_Manager.h"
 #include "TextRenderer.h"
+#include "Audio_manager.h"
 
 // ---------------------------------------------------------------------------
 class Block : public game_object_basic<Block>
@@ -27,7 +28,6 @@ class MinecraftLayer : public Layer
     static constexpr float  PLAYER_HEIGHT = 1.8f;
     static constexpr float  PLAYER_RADIUS = 0.3f;
     static constexpr float  PLAYER_SPEED = 5.0f;
-    // v = sqrt(2 * g * h), h=1 blok => sqrt(2 * 9.81 * 1.0) = 4.43
     static constexpr float  JUMP_VELOCITY = 4.43f;
     static constexpr float  MOUSE_SENSITIVITY = 0.1f;
     static constexpr float  REACH = 10.0f;
@@ -50,7 +50,6 @@ public:
 
         glfwSetInputMode(win.get_handle(), GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 
-        // Kamera
         m_camera = std::make_unique<camera_test>(
             glm::vec3(5.0f, 5.0f, 5.0f),
             glm::vec3(225.0f, -30.0f, 0.0f)
@@ -68,30 +67,33 @@ public:
             "Shaders/Fragment_shaders/Ui_fragment.frag"
         );
 
-        // Fizik
         m_physics = std::make_unique<Physics_manager>(nullptr);
+
+        Audio_manager::Config audio_cfg;
+        audio_cfg.master_volume = 1.0f;
+        audio_cfg.max_sources = 32;
+        m_audio = std::make_unique<Audio_manager>(audio_cfg);
+
+        m_break_sound_buffer = m_audio->load_wav("Sounds\\click.wav");
+        m_place_sound_buffer = m_audio->load_wav("Sounds\\click.wav");
 
         // BlockWorld
         m_world = std::make_unique<BlockWorld<Block>>(global_registry, m_physics.get());
 
-        // Blok modeli: Blender 2x2x2 kupu, scale 0.5 ile 1x1x1
         m_block_model = std::make_unique<game_object_basic_model>();
         m_block_model->import_model_from_file("Models\\cube.obj");
         m_block_model->add_instance_buffer(16, MODEL_ATRIB_LAST_INDEX + 1);
         m_block_model->add_instance_buffer(9, MODEL_ATRIB_LAST_INDEX + 5);
         Block::set_model(m_block_model.get(), 4096);
 
-        // Zemin
         generate_flat_world(25, 25);
 
-        // Oyuncu
         setup_player();
 
         // UBO
         m_shader->bind_UBO("projectionXview_block", m_camera->Ubo_slot);
         setup_light();
 
-        // Eventler
         setup_events(input, win);
 
         m_ui.init(m_app.get_input_manager());
@@ -107,7 +109,7 @@ public:
 
         m_crosshair->set_text_scale(1.5f);
         m_ui.add_widget(m_crosshair);
-        
+
         glClearColor(0.53f, 0.81f, 0.98f, 1.0f);
         glEnable(GL_DEPTH_TEST);
         glEnable(GL_CULL_FACE);
@@ -138,6 +140,13 @@ public:
         m_physics->Tick(dt, global_registry);
         sync_camera_to_player();
 
+        m_audio->update_listener(
+            m_camera->camera_position,
+            m_camera->camera_front,
+            glm::vec3(0.0f, 1.0f, 0.0f)
+        );
+        m_audio->cleanup_finished_sources();
+
         m_frame_count++;
         if (now - m_fps_timer >= 1.0)
         {
@@ -153,8 +162,6 @@ public:
         m_shader->use();
         m_shader->setVec3("viewPos", m_camera->camera_position);
 
-        // Kac aktif blok var? object_ptrs'deki son dolu slot + 1 = draw amount
-        // Bu olmadan silinen bloklar GPU'da eski transform birakirken fazla instance cizilir
         auto region = Block::get_class_region();
         unsigned int draw_count = 0;
         if (region)
@@ -182,14 +189,18 @@ private:
     std::unique_ptr<BlockWorld<Block>>       m_world;
     std::unique_ptr<game_object_basic_model> m_block_model;
     std::unique_ptr<Shader>                  m_ui_shader;
+    std::unique_ptr<Audio_manager>           m_audio;
+
+    ALuint m_break_sound_buffer = 0;
+    ALuint m_place_sound_buffer = 0;
 
     JPH::BodyID m_player_body;
 
     TextRenderer m_text_renderer{
-    "Textures/Font_texture_Atlas/letter.png",         // texture_path
-    "Textures/Font_texture_Atlas/letter.txt",         // char_set_path
-    1280, 720,                                         // screen_width, screen_height
-    16, 16,                                            // char_width, char_height
+    "Textures/Font_texture_Atlas/letter.png",      
+    "Textures/Font_texture_Atlas/letter.txt",     
+    1280, 720,                                    
+    16, 16,                                        
     "Shaders/Vertex_shaders/Text_render_vertex.vert",
     "Shaders/Fragment_shaders/Text_render_fragment.frag",
     "Shaders/Geometry_shaders/Text_render_geometry.geom"
@@ -203,8 +214,6 @@ private:
     int    m_fps = 0;
     double m_fps_timer = 0.0;
 
-    // Mouse click flag'leri: event callback tarafindan set edilir,
-    // process_input() tarafindan hem kullanilip hem temizlenir.
     bool m_left_clicked = false;
     bool m_right_clicked = false;
 
@@ -302,7 +311,6 @@ private:
     // -----------------------------------------------------------------------
     void setup_events(Input_Manager* input, Window_Manager& win)
     {
-        // Fare hareketi -> kamera
         m_mouse_move_receiver = Event_management::make_receiver(
             [this](const Event_management::Event& e)
             {
@@ -316,8 +324,6 @@ private:
         input->subscribe(Input_channel_names[Mouse_input],
             Event_management::Event_type::Mouse_moved, m_mouse_move_receiver);
 
-        // Sol klik = kir, sag klik = koy
-        // Event sistemi ile tek seferlik press yakalama — hold'a geçince tekrar tetiklenmez
         m_mouse_click_receiver = Event_management::make_receiver(
             [this](const Event_management::Event& e)
             {
@@ -357,7 +363,6 @@ private:
         GLFWwindow* window = m_app.get_window().get_handle();
         JPH::BodyInterface* bi = m_physics->get_body_interface();
 
-        // WASD hareketi
         glm::vec3 move(0.0f);
         if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) move += m_camera->camera_front;
         if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) move -= m_camera->camera_front;
@@ -370,8 +375,6 @@ private:
         JPH::Vec3 cur_vel = bi->GetLinearVelocity(m_player_body);
         bi->SetLinearVelocity(m_player_body, JPH::Vec3(move.x, cur_vel.GetY(), move.z));
 
-        // Ziplama — yerde olup olmadigini kontrol et
-        // Oyuncunun altina kisa bir ray at, yere yakin mi bak
         bool on_ground = false;
         {
             JPH::RVec3 player_rvec = bi->GetCenterOfMassPosition(m_player_body);
@@ -396,13 +399,11 @@ private:
             bi->SetLinearVelocity(m_player_body, JPH::Vec3(cur_vel.GetX(), JUMP_VELOCITY, cur_vel.GetZ()));
         space_was_pressed = space_now;
 
-        // Fare kilidi
         if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
             glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
         if (glfwGetKey(window, GLFW_KEY_TAB) == GLFW_PRESS)
             glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 
-        // F11 fullscreen
         if (glfwGetKey(window, GLFW_KEY_F11) == GLFW_PRESS && m_f11_pressable)
         {
             m_app.get_window().toggle_fullscreen();
@@ -411,21 +412,23 @@ private:
         if (glfwGetKey(window, GLFW_KEY_F11) == GLFW_RELEASE)
             m_f11_pressable = true;
 
-        // ---------------------------------------------------------------
-        // Sol klik: blok kir
-        // Flag update'den once temizlenir — ayni frame'de iki islem olmaz
-        // ---------------------------------------------------------------
+
         if (m_left_clicked)
         {
-            m_left_clicked = false;     // once temizle, sonra isle
+            m_left_clicked = false;    
 
             auto hit = m_world->raycast(m_camera->camera_position, m_camera->camera_front, REACH, m_player_body);
             if (hit)
             {
                 bool removed = m_world->remove_block(hit->block_pos);
                 if (removed)
+                {
                     LOG_INFO("Block removed at %d %d %d",
                         hit->block_pos.x, hit->block_pos.y, hit->block_pos.z);
+
+                    glm::vec3 sound_pos = glm::vec3(hit->block_pos) + glm::vec3(0.5f);
+                    m_audio->play_oneshot_3d("Sounds/click.wav", sound_pos);
+                }
                 else
                     LOG_WARNING("remove_block failed at %d %d %d",
                         hit->block_pos.x, hit->block_pos.y, hit->block_pos.z);
@@ -436,20 +439,16 @@ private:
             }
         }
 
-        // ---------------------------------------------------------------
-        // Sag klik: blok koy — blok yerlestirilecek pozisyon = hit blogu + normal
-        // ---------------------------------------------------------------
+
         if (m_right_clicked)
         {
-            m_right_clicked = false;    // once temizle, sonra isle
+            m_right_clicked = false;  
 
             auto hit = m_world->raycast(m_camera->camera_position, m_camera->camera_front, REACH, m_player_body);
             if (hit)
             {
                 glm::ivec3 new_pos = hit->block_pos + hit->normal;
 
-                // Oyuncunun icine blok yerlesmesin (basit AABB kontrolu)
-                // Oyuncu pozisyonu: kamera - biraz asagi
                 glm::vec3 player_center = m_camera->camera_position - glm::vec3(0, PLAYER_HEIGHT * 0.4f, 0);
                 glm::ivec3 player_grid = glm::ivec3(glm::floor(player_center));
 
@@ -470,7 +469,12 @@ private:
                         });
 
                     if (placed)
+                    {
                         LOG_INFO("Block placed at %d %d %d", new_pos.x, new_pos.y, new_pos.z);
+
+                        glm::vec3 sound_pos = glm::vec3(new_pos) + glm::vec3(0.5f);
+                        m_audio->play_oneshot_3d("Sounds/click.wav", sound_pos);
+                    }
                     else
                         LOG_INFO("Right click: position already occupied at %d %d %d",
                             new_pos.x, new_pos.y, new_pos.z);
