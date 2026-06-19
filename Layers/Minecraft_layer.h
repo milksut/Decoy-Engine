@@ -8,10 +8,8 @@
 #include "Block_word.h"
 #include "Globals.h"
 #include "Shader.h"
-
-#include <Jolt/Jolt.h>
-#include <Jolt/Physics/Collision/Shape/CapsuleShape.h>
-#include <Jolt/Physics/Body/BodyCreationSettings.h>
+#include "UI_Manager.h"
+#include "TextRenderer.h"
 
 // ---------------------------------------------------------------------------
 class Block : public game_object_basic<Block>
@@ -37,6 +35,7 @@ class MinecraftLayer : public Layer
     static constexpr double TARGET_FRAME_TIME = 1.0 / TARGET_FPS;
 
 public:
+
     MinecraftLayer(App& app)
         : Layer("MinecraftLayer")
         , m_app(app)
@@ -64,6 +63,11 @@ public:
             "Shaders/Fragment_shaders/Loaded_model_fragment.frag"
         );
 
+        m_ui_shader = std::make_unique<Shader>(
+            "Shaders/Vertex_shaders/Ui_vertex.vert",
+            "Shaders/Fragment_shaders/Ui_fragment.frag"
+        );
+
         // Fizik
         m_physics = std::make_unique<Physics_manager>(nullptr);
 
@@ -83,13 +87,27 @@ public:
         // Oyuncu
         setup_player();
 
-        // UBO + isik
+        // UBO
         m_shader->bind_UBO("projectionXview_block", m_camera->Ubo_slot);
         setup_light();
 
         // Eventler
         setup_events(input, win);
 
+        m_ui.init(m_app.get_input_manager());
+
+        m_crosshair = new Button(
+            glm::vec2(-0.01f, -0.01f),
+            glm::vec2(0.01f, 0.01f),
+            "",
+            []() {},
+            m_ui_shader.get(),
+            &m_text_renderer
+        );
+
+        m_crosshair->set_text_scale(1.5f);
+        m_ui.add_widget(m_crosshair);
+        
         glClearColor(0.53f, 0.81f, 0.98f, 1.0f);
         glEnable(GL_DEPTH_TEST);
         glEnable(GL_CULL_FACE);
@@ -99,6 +117,9 @@ public:
 
     void onDetach() override
     {
+        delete m_crosshair;
+        m_crosshair = nullptr;
+
         m_world->clear();
         if (m_physics && !m_player_body.IsInvalid())
             m_physics->delete_body(m_player_body);
@@ -106,6 +127,7 @@ public:
 
     void Update() override
     {
+        m_ui.update();
         double now = glfwGetTime();
         float  dt = static_cast<float>(now - m_last_frame);
         m_last_frame = now;
@@ -148,6 +170,7 @@ public:
         }
 
         Block::draw(*m_shader, draw_count);
+        m_ui.render();
     }
 
 private:
@@ -158,8 +181,22 @@ private:
     std::unique_ptr<Physics_manager>         m_physics;
     std::unique_ptr<BlockWorld<Block>>       m_world;
     std::unique_ptr<game_object_basic_model> m_block_model;
+    std::unique_ptr<Shader>                  m_ui_shader;
 
     JPH::BodyID m_player_body;
+
+    TextRenderer m_text_renderer{
+    "Textures/Font_texture_Atlas/letter.png",         // texture_path
+    "Textures/Font_texture_Atlas/letter.txt",         // char_set_path
+    1280, 720,                                         // screen_width, screen_height
+    16, 16,                                            // char_width, char_height
+    "Shaders/Vertex_shaders/Text_render_vertex.vert",
+    "Shaders/Fragment_shaders/Text_render_fragment.frag",
+    "Shaders/Geometry_shaders/Text_render_geometry.geom"
+    };
+
+    UI_manager m_ui;
+    Button* m_crosshair = nullptr;
 
     double m_last_frame = 0.0;
     int    m_frame_count = 0;
@@ -299,7 +336,18 @@ private:
                 if (e.type != Event_management::Event_type::Window_framebuffer_resized) return;
                 const auto& r = static_cast<const Window_framebuffer_resize_event&>(e);
                 m_camera->update_projection(70.0f, r.new_aspect_ratio, 0.05f, 500.0f);
+
+                m_text_renderer.change_screen_size(
+                    r.new_width,
+                    r.new_height
+                );
+
+                m_ui.on_resize(
+                    r.new_width,
+                    r.new_height
+                );
             });
+
         win.subscribe(Event_management::Event_type::Window_framebuffer_resized, m_resize_receiver);
     }
 

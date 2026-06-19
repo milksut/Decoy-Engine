@@ -8,7 +8,6 @@
 #include <assimp/scene.h>
 #include <assimp/postprocess.h>
 
-//TODO: please add logs to this header, most of it just return -1 and dont log anything
 /// <summary>
 ///     Maps internal texture types to Assimp texture types for import processing.
 /// </summary>
