@@ -34,6 +34,10 @@ class MinecraftLayer : public Layer
     static constexpr double TARGET_FPS = 144.0;
     static constexpr double TARGET_FRAME_TIME = 1.0 / TARGET_FPS;
 
+    static constexpr float  CAPSULE_HALF_HEIGHT = PLAYER_HEIGHT * 0.5f - PLAYER_RADIUS; // 0.6f
+    static constexpr float  CAPSULE_TOP = CAPSULE_HALF_HEIGHT + PLAYER_RADIUS;  // 0.9f
+    static constexpr float  EYE_OFFSET = CAPSULE_TOP - 0.05f;                  // 0.85f
+
 public:
 
     MinecraftLayer(App& app)
@@ -56,7 +60,6 @@ public:
         );
         m_camera->update_projection(70.0f, cfg.aspect_ratio, 0.05f, 500.0f);
 
-        // Shader
         m_shader = std::make_unique<Shader>(
             "Shaders/Vertex_shaders/Loaded_model_vertex.vert",
             "Shaders/Fragment_shaders/Loaded_model_fragment.frag"
@@ -66,6 +69,11 @@ public:
             "Shaders/Vertex_shaders/Ui_vertex.vert",
             "Shaders/Fragment_shaders/Ui_fragment.frag"
         );
+
+        m_text_renderer.change_deleted_colors(0, glm::vec4(0.0f, 0.0f, 0.0f, 1.0f), 1.5f, glm::vec4(1.0f, 1.0f, 1.0f, 0.1f));
+        m_text_renderer.change_deleted_colors(1, glm::vec4(1.0f, 1.0f, 1.0f, 1.0f), 1.5f, glm::vec4(1.0f, 1.0f, 1.0f, 1.0f));
+        m_text_renderer.push_deleted_colors();
+
 
         m_physics = std::make_unique<Physics_manager>(nullptr, &global_registry);
 
@@ -77,7 +85,6 @@ public:
         m_break_sound_buffer = m_audio->load_wav("Sounds\\click.wav");
         m_place_sound_buffer = m_audio->load_wav("Sounds\\click.wav");
 
-        // BlockWorld
         m_world = std::make_unique<BlockWorld<Block>>(global_registry, m_physics.get());
 
         m_block_model = std::make_unique<game_object_basic_model>();
@@ -91,7 +98,6 @@ public:
 
         setup_player();
 
-        // UBO
         m_shader->bind_UBO("projectionXview_block", m_camera->Ubo_slot);
         setup_light();
 
@@ -99,21 +105,31 @@ public:
 
         m_ui.init(m_app.get_input_manager());
 
+        const float crosshair_text_scale = 1.0f;
+
         m_crosshair = new Button(
-            glm::vec2(-0.01f, -0.01f),
-            glm::vec2(0.01f, 0.01f),
-            "",
+            glm::vec2(0.0f, 0.0f),
+            glm::vec2(0.0f, 0.0f),
+            "X",
             []() {},
             m_ui_shader.get(),
             &m_text_renderer
         );
 
-        m_crosshair->set_text_scale(1.5f);
+        m_crosshair->set_text_scale(crosshair_text_scale);
+
+        glm::vec2 text_size = m_text_renderer.get_text_size("X", crosshair_text_scale);
+        m_crosshair->size = text_size;
+        m_crosshair->position = -text_size * 0.5f;
+
         m_ui.add_widget(m_crosshair);
+		m_crosshair->set_draw_background(false);
 
         glClearColor(0.53f, 0.81f, 0.98f, 1.0f);
         glEnable(GL_DEPTH_TEST);
         glEnable(GL_CULL_FACE);
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
         glfwSetTime(0.0);
         m_last_frame = glfwGetTime();
     }
@@ -137,9 +153,11 @@ public:
 
         game_object_base::Tick(global_registry);
 
-        process_input(dt);
+        process_movement_input(dt);
         m_physics->Tick(dt);
         sync_camera_to_player();
+
+        process_block_interaction();
 
         m_audio->update_listener(
             m_camera->camera_position,
@@ -198,13 +216,13 @@ private:
     JPH::BodyID m_player_body;
 
     TextRenderer m_text_renderer{
-    "Textures/Font_texture_Atlas/letter.png",
-    "Textures/Font_texture_Atlas/letter.txt",
-    1280, 720,
-    16, 16,
-    "Shaders/Vertex_shaders/Text_render_vertex.vert",
-    "Shaders/Fragment_shaders/Text_render_fragment.frag",
-    "Shaders/Geometry_shaders/Text_render_geometry.geom"
+        "Textures/Font_texture_Atlas/letter.png",
+        "Textures/Font_texture_Atlas/letter.txt",
+        1280, 720,
+        16, 32,
+        "Shaders/Vertex_shaders/Text_render_vertex.vert",
+        "Shaders/Fragment_shaders/Text_render_fragment.frag",
+        "Shaders/Geometry_shaders/Text_render_geometry.geom"
     };
 
     UI_manager m_ui;
@@ -254,7 +272,7 @@ private:
         JPH::BodyInterface* bi = m_physics->get_body_interface();
 
         JPH::CapsuleShapeSettings* capsule_settings = new JPH::CapsuleShapeSettings(
-            PLAYER_HEIGHT * 0.5f - PLAYER_RADIUS, PLAYER_RADIUS);
+            CAPSULE_HALF_HEIGHT, PLAYER_RADIUS);
 
         JPH::ShapeSettings::ShapeResult shape_result = capsule_settings->Create();
         if (shape_result.HasError())
@@ -336,7 +354,6 @@ private:
         input->subscribe(Input_channel_names[Mouse_input],
             Event_management::Event_type::Mouse_button_pressed, m_mouse_click_receiver);
 
-        // Resize
         m_resize_receiver = Event_management::make_receiver(
             [this](const Event_management::Event& e)
             {
@@ -344,22 +361,15 @@ private:
                 const auto& r = static_cast<const Window_framebuffer_resize_event&>(e);
                 m_camera->update_projection(70.0f, r.new_aspect_ratio, 0.05f, 500.0f);
 
-                m_text_renderer.change_screen_size(
-                    r.new_width,
-                    r.new_height
-                );
-
-                m_ui.on_resize(
-                    r.new_width,
-                    r.new_height
-                );
+                m_text_renderer.change_screen_size(r.new_width, r.new_height);
+                m_ui.on_resize(r.new_width, r.new_height);
             });
 
         win.subscribe(Event_management::Event_type::Window_framebuffer_resized, m_resize_receiver);
     }
 
     // -----------------------------------------------------------------------
-    void process_input(float dt)
+    void process_movement_input(float dt)
     {
         GLFWwindow* window = m_app.get_window().get_handle();
         JPH::BodyInterface* bi = m_physics->get_body_interface();
@@ -379,12 +389,15 @@ private:
         bool on_ground = false;
         {
             JPH::RVec3 player_rvec = bi->GetCenterOfMassPosition(m_player_body);
-            JPH::Vec3 player_pos_jolt((float)player_rvec.GetX(), (float)player_rvec.GetY(), (float)player_rvec.GetZ());
+            JPH::Vec3  player_pos_jolt(
+                (float)player_rvec.GetX(),
+                (float)player_rvec.GetY(),
+                (float)player_rvec.GetZ());
             JPH::RRayCast ground_ray(
                 JPH::RVec3(player_pos_jolt.GetX(), player_pos_jolt.GetY(), player_pos_jolt.GetZ()),
-                JPH::Vec3(0.0f, -(PLAYER_HEIGHT * 0.5f + 0.15f), 0.0f)
+                JPH::Vec3(0.0f, -(CAPSULE_TOP + 0.15f), 0.0f)
             );
-            AllBroadPhaseFilter bp;
+            AllBroadPhaseFilter  bp;
             AllObjectLayerFilter ol;
             std::vector<JPH::RayCastResult> ground_hits;
             if (m_physics->cast_ray_all(ground_ray, ground_hits, bp, ol))
@@ -412,13 +425,20 @@ private:
         }
         if (glfwGetKey(window, GLFW_KEY_F11) == GLFW_RELEASE)
             m_f11_pressable = true;
+    }
 
-
+    void process_block_interaction()
+    {
         if (m_left_clicked)
         {
             m_left_clicked = false;
 
-            auto hit = m_world->raycast(m_camera->camera_position, m_camera->camera_front, REACH, m_player_body);
+            auto hit = m_world->raycast(
+                m_camera->camera_position - glm::vec3(0.0f, 0.5f, 0.0f),
+                m_camera->camera_front,
+                REACH,
+                m_player_body);
+
             if (hit)
             {
                 bool removed = m_world->remove_block(hit->block_pos);
@@ -426,7 +446,6 @@ private:
                 {
                     LOG_INFO("Block removed at %d %d %d",
                         hit->block_pos.x, hit->block_pos.y, hit->block_pos.z);
-
                     glm::vec3 sound_pos = glm::vec3(hit->block_pos) + glm::vec3(0.5f);
                     m_audio->play_oneshot_3d("Sounds/click.wav", sound_pos);
                 }
@@ -440,18 +459,24 @@ private:
             }
         }
 
-
         if (m_right_clicked)
         {
             m_right_clicked = false;
 
-            auto hit = m_world->raycast(m_camera->camera_position, m_camera->camera_front, REACH, m_player_body);
+            auto hit = m_world->raycast(
+                m_camera->camera_position - glm::vec3(0.0f, 0.5f, 0.0f),
+                m_camera->camera_front,
+                REACH,
+                m_player_body);
+
             if (hit)
             {
                 glm::ivec3 new_pos = hit->block_pos + hit->normal;
 
-                glm::vec3 player_center = m_camera->camera_position - glm::vec3(0, PLAYER_HEIGHT * 0.4f, 0);
-                glm::ivec3 player_grid = glm::ivec3(glm::floor(player_center));
+                // Kamera pozisyonundan EYE_OFFSET cikararak fizik merkezini hesapla.
+                // sync_camera_to_player ile ayni sabit kullaniliyor -- her zaman tutarli.
+                glm::vec3  phys_center = m_camera->camera_position - glm::vec3(0.0f, EYE_OFFSET, 0.0f);
+                glm::ivec3 player_grid = glm::ivec3(glm::floor(phys_center));
 
                 if (new_pos == player_grid || new_pos == player_grid + glm::ivec3(0, 1, 0))
                 {
@@ -472,7 +497,6 @@ private:
                     if (placed)
                     {
                         LOG_INFO("Block placed at %d %d %d", new_pos.x, new_pos.y, new_pos.z);
-
                         glm::vec3 sound_pos = glm::vec3(new_pos) + glm::vec3(0.5f);
                         m_audio->play_oneshot_3d("Sounds/click.wav", sound_pos);
                     }
@@ -489,13 +513,17 @@ private:
     }
 
     // -----------------------------------------------------------------------
+    // Kamerayi kapsul merkezinin EYE_OFFSET kadar ustune yerlestirir.
+    // process_block_interaction'daki player_grid hesabi da ayni EYE_OFFSET'i
+    // kullanir -- ikisi her zaman tutarlidir.
+    // -----------------------------------------------------------------------
     void sync_camera_to_player()
     {
         JPH::BodyInterface* bi = m_physics->get_body_interface();
         JPH::RVec3          pos = bi->GetCenterOfMassPosition(m_player_body);
         m_camera->update_camera_position(glm::vec3(
             static_cast<float>(pos.GetX()),
-            static_cast<float>(pos.GetY()) + PLAYER_HEIGHT * 0.4f,
+            static_cast<float>(pos.GetY()) + EYE_OFFSET,
             static_cast<float>(pos.GetZ())
         ));
     }

@@ -23,7 +23,10 @@ public:
 
     glm::vec4 current_color;
 
+    glm::vec4 text_color = { 1.0f, 1.0f, 1.0f, 1.0f };
+
     float text_scale = 1.0f;
+    bool  draw_background = true;
 
     Button(glm::vec2 pos,
         glm::vec2 size,
@@ -57,6 +60,15 @@ public:
     void set_text_scale(float s)
     {
         text_scale = s;
+    }
+
+    /// <summary>
+    ///     Enables or disables drawing the button's background quad.
+    /// </summary>
+    /// <param name="enabled">[in] True to draw the background quad, false to skip it.</param>
+    void set_draw_background(bool enabled)
+    {
+        draw_background = enabled;
     }
 
     /// <summary>
@@ -102,18 +114,12 @@ public:
     /// </remarks>
     void render() override
     {
-        // =========================
-        // BACKGROUND (UI QUAD)
-        // =========================
-        draw_quad(shader, current_color);
+        if (draw_background)
+            draw_quad(shader, current_color);
 
-        // =========================
-        // TEXT CENTERING
-        // =========================
-        glm::vec2 text_size = text->get_text_size(label, text_scale);
-
-        float text_x = position.x + (size.x - text_size.x) * 0.5f;
-        float text_y = position.y + (size.y - text_size.y) * 0.5f;
+        glm::vec2 text_sz = text->get_text_size(label, text_scale);
+        float text_x = position.x + (size.x - text_sz.x) * 0.5f;
+        float text_y = position.y + (size.y - text_sz.y) * 0.5f;
 
         text->render_text(label, text_x, text_y, text_scale);
     }
