@@ -9,6 +9,7 @@
 #include "Globals.h"
 #include "Shader.h"
 #include "UI_Manager.h"
+#include "UI/Bar.h"
 #include "TextRenderer.h"
 #include "Audio_manager.h"
 
@@ -34,9 +35,12 @@ class MinecraftLayer : public Layer
     static constexpr double TARGET_FPS = 144.0;
     static constexpr double TARGET_FRAME_TIME = 1.0 / TARGET_FPS;
 
-    static constexpr float  CAPSULE_HALF_HEIGHT = PLAYER_HEIGHT * 0.5f - PLAYER_RADIUS; // 0.6f
-    static constexpr float  CAPSULE_TOP = CAPSULE_HALF_HEIGHT + PLAYER_RADIUS;  // 0.9f
-    static constexpr float  EYE_OFFSET = CAPSULE_TOP - 0.05f;                  // 0.85f
+    static constexpr float  CAPSULE_HALF_HEIGHT = PLAYER_HEIGHT * 0.5f - PLAYER_RADIUS;
+    static constexpr float  CAPSULE_TOP = CAPSULE_HALF_HEIGHT + PLAYER_RADIUS;
+    static constexpr float  EYE_OFFSET = CAPSULE_TOP - 0.05f;
+
+    static constexpr float  PLAYER_MAX_HP = 100.0f;
+    static constexpr float  HP_PER_ACTION = PLAYER_MAX_HP * 0.05f; // %5
 
 public:
 
@@ -74,7 +78,6 @@ public:
         m_text_renderer.change_deleted_colors(1, glm::vec4(1.0f, 1.0f, 1.0f, 1.0f), 1.5f, glm::vec4(1.0f, 1.0f, 1.0f, 1.0f));
         m_text_renderer.push_deleted_colors();
 
-
         m_physics = std::make_unique<Physics_manager>(nullptr, &global_registry);
 
         Audio_manager::Config audio_cfg;
@@ -106,24 +109,33 @@ public:
         m_ui.init(m_app.get_input_manager());
 
         const float crosshair_text_scale = 1.0f;
-
         m_crosshair = new Button(
             glm::vec2(0.0f, 0.0f),
             glm::vec2(0.0f, 0.0f),
-            "X",
+            "+",
             []() {},
             m_ui_shader.get(),
             &m_text_renderer
         );
-
         m_crosshair->set_text_scale(crosshair_text_scale);
-
+        m_crosshair->set_draw_background(false);
         glm::vec2 text_size = m_text_renderer.get_text_size("X", crosshair_text_scale);
         m_crosshair->size = text_size;
         m_crosshair->position = -text_size * 0.5f;
-
         m_ui.add_widget(m_crosshair);
-		m_crosshair->set_draw_background(false);
+
+        m_health_bar = new Bar(
+            glm::vec2(-0.4f, -0.95f),
+            glm::vec2(0.8f, 0.04f),
+            m_ui_shader.get()
+        );
+        m_health_bar->set_range(0.0f, PLAYER_MAX_HP);
+        m_health_bar->set_value(PLAYER_MAX_HP);
+        m_health_bar->fill_color = glm::vec4(0.1f, 0.8f, 0.1f, 1.0f);
+        m_health_bar->background_color = glm::vec4(0.2f, 0.2f, 0.2f, 0.8f);
+        m_health_bar->border_color = glm::vec4(0.0f, 0.0f, 0.0f, 1.0f);
+        m_health_bar->border_thickness = 0.003f;
+        m_ui.add_widget(m_health_bar);
 
         glClearColor(0.53f, 0.81f, 0.98f, 1.0f);
         glEnable(GL_DEPTH_TEST);
@@ -138,6 +150,9 @@ public:
     {
         delete m_crosshair;
         m_crosshair = nullptr;
+
+        delete m_health_bar;
+        m_health_bar = nullptr;
 
         m_world->clear();
         if (m_physics && !m_player_body.IsInvalid())
@@ -199,6 +214,17 @@ public:
         m_ui.render();
     }
 
+    /// <summary>
+    ///     Sets the player's current health and updates the health bar.
+    /// </summary>
+    /// <param name="hp">[in] New health value.</param>
+    void set_player_health(float hp)
+    {
+        m_player_hp = glm::clamp(hp, 0.0f, PLAYER_MAX_HP);
+        if (m_health_bar)
+            m_health_bar->set_value(m_player_hp);
+    }
+
 private:
     App& m_app;
 
@@ -215,6 +241,8 @@ private:
 
     JPH::BodyID m_player_body;
 
+    float m_player_hp = PLAYER_MAX_HP;
+
     TextRenderer m_text_renderer{
         "Textures/Font_texture_Atlas/letter.png",
         "Textures/Font_texture_Atlas/letter.txt",
@@ -227,6 +255,7 @@ private:
 
     UI_manager m_ui;
     Button* m_crosshair = nullptr;
+    Bar* m_health_bar = nullptr;
 
     double m_last_frame = 0.0;
     int    m_frame_count = 0;
@@ -243,7 +272,6 @@ private:
     Event_management::Event_receiver_shared m_mouse_click_receiver;
     Event_management::Event_receiver_shared m_resize_receiver;
 
-    // -----------------------------------------------------------------------
     void generate_flat_world(int size_x, int size_z)
     {
         int idx = 0;
@@ -266,7 +294,6 @@ private:
         LOG_INFO("Generated %zu blocks", m_world->block_count());
     }
 
-    // -----------------------------------------------------------------------
     void setup_player()
     {
         JPH::BodyInterface* bi = m_physics->get_body_interface();
@@ -309,7 +336,6 @@ private:
             LOG_INFO("Player body created successfully.");
     }
 
-    // -----------------------------------------------------------------------
     void setup_light()
     {
         m_shader->use();
@@ -327,7 +353,6 @@ private:
         m_shader->setFloat("lights[0].quadratic", 0.0f);
     }
 
-    // -----------------------------------------------------------------------
     void setup_events(Input_Manager* input, Window_Manager& win)
     {
         m_mouse_move_receiver = Event_management::make_receiver(
@@ -360,7 +385,6 @@ private:
                 if (e.type != Event_management::Event_type::Window_framebuffer_resized) return;
                 const auto& r = static_cast<const Window_framebuffer_resize_event&>(e);
                 m_camera->update_projection(70.0f, r.new_aspect_ratio, 0.05f, 500.0f);
-
                 m_text_renderer.change_screen_size(r.new_width, r.new_height);
                 m_ui.on_resize(r.new_width, r.new_height);
             });
@@ -368,7 +392,6 @@ private:
         win.subscribe(Event_management::Event_type::Window_framebuffer_resized, m_resize_receiver);
     }
 
-    // -----------------------------------------------------------------------
     void process_movement_input(float dt)
     {
         GLFWwindow* window = m_app.get_window().get_handle();
@@ -444,6 +467,7 @@ private:
                 bool removed = m_world->remove_block(hit->block_pos);
                 if (removed)
                 {
+                    set_player_health(m_player_hp - HP_PER_ACTION);
                     LOG_INFO("Block removed at %d %d %d",
                         hit->block_pos.x, hit->block_pos.y, hit->block_pos.z);
                     glm::vec3 sound_pos = glm::vec3(hit->block_pos) + glm::vec3(0.5f);
@@ -473,8 +497,6 @@ private:
             {
                 glm::ivec3 new_pos = hit->block_pos + hit->normal;
 
-                // Kamera pozisyonundan EYE_OFFSET cikararak fizik merkezini hesapla.
-                // sync_camera_to_player ile ayni sabit kullaniliyor -- her zaman tutarli.
                 glm::vec3  phys_center = m_camera->camera_position - glm::vec3(0.0f, EYE_OFFSET, 0.0f);
                 glm::ivec3 player_grid = glm::ivec3(glm::floor(phys_center));
 
@@ -496,6 +518,7 @@ private:
 
                     if (placed)
                     {
+                        set_player_health(m_player_hp + HP_PER_ACTION);
                         LOG_INFO("Block placed at %d %d %d", new_pos.x, new_pos.y, new_pos.z);
                         glm::vec3 sound_pos = glm::vec3(new_pos) + glm::vec3(0.5f);
                         m_audio->play_oneshot_3d("Sounds/click.wav", sound_pos);
@@ -512,11 +535,6 @@ private:
         }
     }
 
-    // -----------------------------------------------------------------------
-    // Kamerayi kapsul merkezinin EYE_OFFSET kadar ustune yerlestirir.
-    // process_block_interaction'daki player_grid hesabi da ayni EYE_OFFSET'i
-    // kullanir -- ikisi her zaman tutarlidir.
-    // -----------------------------------------------------------------------
     void sync_camera_to_player()
     {
         JPH::BodyInterface* bi = m_physics->get_body_interface();
