@@ -133,12 +133,12 @@ public:
 				
 		}
 
-		for(int i =0; i< Bone_counter;i++)
+		/*for(int i =0; i< Bone_counter;i++)
 		{
 			LOG_DEBUG("Bone with id: %d appeared %d times.\n",i, bone_id_apper_counter[i]);
 		}
 
-		LOG_DEBUG("Bone with id: -1 appeared %d times.\n", bone_id_minus_one_counter);
+		LOG_DEBUG("Bone with id: -1 appeared %d times.\n", bone_id_minus_one_counter);*/
 
 	}
 
@@ -759,7 +759,7 @@ public:
 			parent_mesh.Meshes.push_back(temp);
 			Meshes.push_back(temp);
 			
-			LOG_INFO("Processed mesh: %s", mesh->mName.C_Str());
+			//LOG_INFO("Processed mesh: %s", mesh->mName.C_Str());
 		}
 
 		//process childs
@@ -1171,9 +1171,26 @@ public:
 		const aiScene* scene = scene_importer.ReadFile(path, aiProcess_Triangulate 
 			| (flip_uvs ? aiProcess_FlipUVs : 0u) | aiProcess_CalcTangentSpace);
 
+
 		if (!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !scene->mRootNode)
 		{
+			if (scene)
+			{
+				LOG_ERROR("Scene exsist");
+				if (scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE)
+					LOG_ERROR("flags are incomplate");
+				if (!scene->mRootNode)
+					LOG_ERROR("root note dosnet exsist");
+			}
+				
+
 			LOG_ERROR("Assimp error: %s", scene_importer.GetErrorString());
+			return -1;
+		}
+
+		if (scene->mNumMeshes == 0)
+		{
+			LOG_ERROR("Assimp loaded file but it contains no meshes (mNumMeshes == 0). File: %s", path.c_str());
 			return -1;
 		}
 		else

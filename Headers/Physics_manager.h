@@ -23,9 +23,132 @@
 #include <Jolt/Physics/Collision/Shape/BoxShape.h>
 #include <Jolt/Physics/Collision/Shape/SphereShape.h>
 #include <Jolt/Physics/Collision/Shape/CapsuleShape.h>
-
-#include <Jolt/Physics/Collision/Shape/CapsuleShape.h>
+#include <Jolt/Physics/Collision/Shape/MeshShape.h>
+#include <Jolt/Physics/Collision/Shape/ScaledShape.h>
 #include <Jolt/Physics/Body/BodyCreationSettings.h>
+
+//TODO: AI code - test and refactor -start--------------------------------------------------------------------------------------
+#include <Jolt/Renderer/DebugRenderer.h>
+#include "Shader.h"
+
+#ifdef JPH_DEBUG_RENDERER
+
+class Jolt_debug_renderer : public JPH::DebugRenderer
+{
+    struct Line_vertex
+    {
+        float x, y, z;
+        float r, g, b, a;
+    };
+
+    std::vector<Line_vertex> m_lines;
+
+    unsigned int m_VAO = 0, m_VBO = 0;
+    Shader* m_shader = nullptr;
+
+    // Jolt requires a concrete Batch type
+    class Batch_impl : public JPH::RefTargetVirtual
+    {
+    public:
+        void AddRef()  override { ++m_ref; }
+        void Release() override { if (--m_ref == 0) delete this; }
+    private:
+        std::atomic<uint32_t> m_ref = 0;
+    };
+
+public:
+    Jolt_debug_renderer(int camera_ubo_slot)
+    {
+        Initialize(); // must call before anything else
+
+        m_shader = new Shader(
+            "Shaders/Vertex_shaders/debug_line_vertex.vert",
+            "Shaders/Fragment_shaders/basic_fragment.frag");
+        m_shader->bind_UBO("projectionXview_block", camera_ubo_slot);
+
+        glGenVertexArrays(1, &m_VAO);
+        glGenBuffers(1, &m_VBO);
+        glBindVertexArray(m_VAO);
+        glBindBuffer(GL_ARRAY_BUFFER, m_VBO);
+
+        glEnableVertexAttribArray(0);
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Line_vertex), (void*)0);
+        glEnableVertexAttribArray(1);
+        glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, sizeof(Line_vertex), (void*)(3 * sizeof(float)));
+
+        glBindVertexArray(0);
+    }
+
+    ~Jolt_debug_renderer()
+    {
+        glDeleteBuffers(1, &m_VBO);
+        glDeleteVertexArrays(1, &m_VAO);
+        delete m_shader;
+    }
+
+    // ── collect lines each frame ──────────────────────────────────────────
+
+    void DrawLine(JPH::RVec3Arg from, JPH::RVec3Arg to, JPH::ColorArg color) override
+    {
+        auto push = [&](JPH::RVec3Arg p)
+            {
+                m_lines.push_back({
+                    (float)p.GetX(), (float)p.GetY(), (float)p.GetZ(),
+                    color.r / 255.0f, color.g / 255.0f,
+                    color.b / 255.0f, color.a / 255.0f });
+            };
+        push(from);
+        push(to);
+    }
+
+    // ── flush to GPU and draw ─────────────────────────────────────────────
+
+    void flush()
+    {
+        if (m_lines.empty()) return;
+
+        glBindBuffer(GL_ARRAY_BUFFER, m_VBO);
+        glBufferData(GL_ARRAY_BUFFER,
+            m_lines.size() * sizeof(Line_vertex),
+            m_lines.data(), GL_DYNAMIC_DRAW);
+
+        m_shader->use();
+        glBindVertexArray(m_VAO);
+        glDrawArrays(GL_LINES, 0, (GLsizei)m_lines.size());
+        glBindVertexArray(0);
+
+        m_lines.clear();
+    }
+
+    // ── required no-ops ──────────────────────────────────────────────────
+
+    void DrawTriangle(JPH::RVec3Arg, JPH::RVec3Arg, JPH::RVec3Arg,
+        JPH::ColorArg, ECastShadow) override {
+    }
+
+    void DrawText3D(JPH::RVec3Arg, const std::string_view&,
+        JPH::ColorArg, float) override {
+    }
+
+    Batch CreateTriangleBatch(const Triangle* inTriangles, int inTriangleCount) override
+    {
+        return new Batch_impl();
+    }
+
+    Batch CreateTriangleBatch(const Vertex* inVertices, int inVertexCount,
+        const JPH::uint32* inIndices, int inIndexCount) override
+    {
+        return new Batch_impl();
+    }
+
+    void DrawGeometry(JPH::RMat44Arg, const JPH::AABox&, float,
+        JPH::ColorArg, const GeometryRef&, ECullMode, ECastShadow, EDrawMode) override {
+    }
+};
+
+#endif // JPH_DEBUG_RENDERER
+//TODO: AI code - test and refactor -end--------------------------------------------------------------------------------------_
+
 
 //TODO:add param, logs
 
@@ -180,11 +303,11 @@ private:
         // For OnContactRemoved — only has BodyID, needs a lock to read body
         unsigned int entity_id_from_body_id(const JPH::BodyID id) const
         {
-            JPH::BodyLockRead lock(physics_system->GetBodyLockInterface(), id);
-
+            // Use NoLock variant — safe to call from within Jolt callbacks
+            // because Jolt guarantees the body is still alive during OnContactRemoved
+            JPH::BodyLockRead lock(physics_system->GetBodyLockInterfaceNoLock(), id);
             if (!lock.Succeeded())
                 return 0;
-
             return entity_id_from_body(lock.GetBody());
         }
 
@@ -507,8 +630,8 @@ public:
 
         view.each([&](entt::entity /*entity*/, RigidBody_component& rb, Transform_component& tf, Id_component& id_comp)
         {
-            if (!bi.IsActive(rb.body_id))
-                return; // skip sleeping bodies
+            /*if (!bi.IsActive(rb.body_id))
+                return; // skip sleeping bodies*/
 
             JPH::RVec3 pos = bi.GetCenterOfMassPosition(rb.body_id);
             JPH::Quat  rot = bi.GetRotation(rb.body_id);
@@ -540,9 +663,12 @@ public:
         // Temp allocator: temp_allacator_size scratch per frame (stack-based, very fast)
         temp_allocator = std::make_unique<JPH::TempAllocatorImpl>(temp_allocator_size);
 
+        unsigned int hw = std::thread::hardware_concurrency();
+        unsigned int worker_threads = 10; // default safe fallback
+        if (hw > 1) worker_threads = hw - 1; // leave one thread for main loop
+
         // Job system: uses Jolt's built-in thread pool
-        job_system = std::make_unique<JPH::JobSystemThreadPool>(JPH::cMaxPhysicsJobs, JPH::cMaxPhysicsBarriers,
-            std::thread::hardware_concurrency() - 1);
+        job_system = std::make_unique<JPH::JobSystemThreadPool>(JPH::cMaxPhysicsJobs, JPH::cMaxPhysicsBarriers, worker_threads);
 
         // ???
         physics_system = std::make_unique<JPH::PhysicsSystem>();
@@ -562,8 +688,7 @@ public:
 
             if(registry != nullptr)
             {
-                contact_listener = std::make_unique<Physics_contact_listener>(
-                    event_manager, registry, physics_system.get());
+                contact_listener = std::make_unique<Physics_contact_listener>(event_manager, registry, physics_system.get());
 
                 physics_system->SetContactListener(contact_listener.get());
             }
@@ -729,7 +854,7 @@ public:
         accumulator = std::min(accumulator, 0.25f);
 
         while (accumulator >= fixed_step)
-        {
+        {   
             // collision_steps = 1 is fine for most games; increase for fast objects
             physics_system->Update(fixed_step, /*collision_steps=*/1, temp_allocator.get(), job_system.get());
             accumulator -= fixed_step;
@@ -800,6 +925,13 @@ public:
         physics_system->GetBodyInterface().SetLinearVelocity(body_id, velocity);
     }
 
+    JPH::Vec3 get_linear_velocity(const JPH::BodyID body_id)
+    {
+        if (physics_system == nullptr) 
+            return JPH::Vec3::sZero();
+        return physics_system->GetBodyInterface().GetLinearVelocity(body_id);
+    }
+
     // Gravity scale per body (e.g. feather = 0.1, heavy rock = 2.0)
     void set_gravity_factor(const JPH::BodyID body_id, const float factor)
     {
@@ -827,5 +959,17 @@ public:
         remove_body(body_id);
         physics_system->GetBodyInterface().DestroyBody(body_id);
     }
-};
 
+#ifdef JPH_DEBUG_RENDERER
+    void draw_debug(Jolt_debug_renderer& renderer)
+    {
+        JPH::BodyManager::DrawSettings settings;
+        settings.mDrawShape = true;
+        settings.mDrawShapeWireframe = true;
+        settings.mDrawBoundingBox = false;
+
+        physics_system->DrawBodies(settings, &renderer);
+        renderer.flush();
+    }
+#endif // JPH_DEBUG_RENDERER
+};

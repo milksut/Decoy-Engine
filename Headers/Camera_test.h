@@ -14,37 +14,16 @@ private:
 	/// <param name="front_change">[in] If true, recalculates the front vector of the camera.</param>
 	/// <param name="right_change">[in] If true, recalculates the right vector of the camera.</param>
 	/// <param name="up_change">[in] If true, recalculates the up vector of the camera.</param>
-	void update_camera_vectors(bool front_change, bool right_change, bool up_change)
+	void update_camera_vectors()
 	{
-		if (front_change)
-		{
-			camera_front = glm::vec3(
-				cos(glm::radians(camera_angles.x)) * cos(glm::radians(camera_angles.y)),	//camera_front.x
-				sin(glm::radians(camera_angles.y)),											//camera_front.y
-				sin(glm::radians(camera_angles.x)) * cos(glm::radians(camera_angles.y))		//camera_front.z
-			);
-			camera_front = glm::normalize(camera_front);
-		}
+		// Normalize orientation to prevent floating-point drift over time
+		orientation = glm::normalize(orientation);
 
-		if(right_change)
-		{
-			if(!up_change)
-			{
-				camera_right = glm::normalize(glm::cross(camera_front, camera_up));
-			}
-			else
-			{
-				camera_right = glm::normalize(glm::cross(camera_front, world_up));
-				glm::mat4 rotationMat = glm::mat4(1.0f);
-				rotationMat = glm::rotate(rotationMat, glm::radians(camera_angles.z), camera_front);
-				camera_right = glm::normalize(rotationMat * glm::vec4(camera_right, 0.0f));
-			}
-		}
+		// Rotate the base forward, right, and up vectors by the current orientation
+		camera_front = glm::normalize(orientation * glm::vec3(0.0f, 0.0f, -1.0f));
+		camera_right = glm::normalize(orientation * glm::vec3(1.0f, 0.0f, 0.0f));
+		camera_up = glm::normalize(orientation * glm::vec3(0.0f, 1.0f, 0.0f));
 
-		if(up_change)
-		{
-			camera_up = glm::normalize(glm::cross(camera_right, camera_front));
-		}
 		update_view_matrix();
 	}
 
@@ -53,7 +32,7 @@ private:
 public:
 	glm::vec3 camera_right;
 	glm::vec3 camera_position;
-	glm::vec3 camera_angles;
+	glm::quat orientation;
 	glm::vec3 camera_front;
 	
 	glm::vec3 camera_up;
@@ -78,9 +57,9 @@ public:
 	/// <param name="world_up_in">[in] World up direction vector.</param>
 	camera_test(
 		glm::vec3 position_in = glm::vec3(0.0f, 0.0f, 3.0f),
-		glm::vec3 camera_angles_in = glm::vec3(0.0f, 0.0f, 0.0f),
+		glm::quat camera_orientation_in = glm::quat(1.0f, 0.0f, 0.0f, 0.0f),
 		glm::vec3 world_up_in = glm::vec3(0.0f, 1.0f, 0.0f))
-		: camera_position(position_in), camera_angles(camera_angles_in), world_up(world_up_in)
+		: camera_position(position_in), orientation(camera_orientation_in), world_up(world_up_in)
 	{
 		glGenBuffers(1, &Camera_UBO);
 		glBindBuffer(GL_UNIFORM_BUFFER, Camera_UBO);
@@ -92,7 +71,7 @@ public:
 
 		LOG_INFO("UBO initialized. Camera UBO: %d bytes", sizeof(glm::mat4));
 		
-		update_camera_vectors(true, true, true);
+		update_camera_vectors();
 		update_projection();
 		update_view_matrix();
 	}
@@ -107,86 +86,34 @@ public:
 	/// <param name="far_plane">[in] Far clipping plane distance. Default is 100.0f.</param>
 	void update_projection(
 		float fov = 45.0f, float aspect_ratio = 800.0f / 600.0f,
-		float near_plane = 0.1f, float far_plane = 100.0f)
+		float near_plane = 0.1f, float far_plane = 10000.0f)
 	{
 		projection = glm::perspective(glm::radians(fov), aspect_ratio, near_plane, far_plane);
 		glBindBuffer(GL_UNIFORM_BUFFER, Camera_UBO);
 		glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(glm::mat4), glm::value_ptr(projection * view));
 	}
 
-	bool flip = false;
-
-	/// <summary>
-	/// Processes mouse movement input and updates the camera's angles (pitch, yaw, roll) accordingly.
-	/// Updates the camera vectors after applying the changes.
-	/// </summary>
-	/// <param name="xoffset">[in] The horizontal mouse movement offset.</param>
-	/// <param name="yoffset">[in] The vertical mouse movement offset.</param>
-	/// <param name="sensitivity">[in] Sensitivity factor for the mouse movement. Default is 0.1f.</param>
+	//TODO:fix param
 	void process_mouse_movement(float xoffset, float yoffset, float sensitivity = 0.1f)
 	{
 		xoffset *= sensitivity;
 		yoffset *= sensitivity;
 
-		camera_angles.x += xoffset * cos(glm::radians(camera_angles.z))
-			- yoffset * sin(glm::radians(camera_angles.z));
+		glm::quat yaw_quat = glm::angleAxis(glm::radians(-xoffset), camera_up);
 
-		camera_angles.y -= (flip ? -1:1) *( xoffset * sin(glm::radians(camera_angles.z))
-			+ yoffset * cos(glm::radians(camera_angles.z)));
+		glm::quat pitch_quat = glm::angleAxis(glm::radians(-yoffset), camera_right);
 
+		orientation = orientation * yaw_quat * pitch_quat;
 
-		if (camera_angles.x >= 360.0f)
-			camera_angles.x -= 360.0f;
-
-		if (camera_angles.x < 0.0f)
-			camera_angles.x += 360.0f;
-
-
-		if (camera_angles.y >= 360.0f)
-			camera_angles.y -= 360.0f;
-
-		if (camera_angles.y < 0.0f)
-			camera_angles.y += 360.0f;
-
-
-		if (camera_angles.y >= 90.0f && camera_angles.y <= 270.0f)
-		{
-			if(!flip)
-			{
-				camera_angles.z += 180.0f; flip = true;
-			}
-		}
-		else
-		{
-			if(flip)
-			{
-				camera_angles.z += 180.0f; flip = false;
-			}
-		}
-
-		if (camera_angles.z >= 360.0f)
-			camera_angles.z -= 360.0f;
-
-		if (camera_angles.z < 0.0f)
-			camera_angles.z += 360.0f;
-
-		//update_camera_vectors(xoffset||yoffset,xoffset,yoffset);
-		update_camera_vectors(true,true,true);
+		update_camera_vectors();
 	}
 
-	/// <summary>
-	/// Tilts (rolls) the camera around its front axis by the given angle.
-	/// Updates the right and up vectors after applying the tilt.
-	/// </summary>
-	/// <param name="angle">[in] The angle in degrees to tilt the camera. Positive values tilt clockwise.</param>
+	//TODO:fix param
 	void camera_tilt(float angle)
 	{
-		camera_angles.z += angle;
-		if (camera_angles.z >= 360.0f)
-			camera_angles.z -= 360.0f;
-		if (camera_angles.z < 0.0f)
-			camera_angles.z += 360.0f;
-		update_camera_vectors(false, true, true);
+		glm::quat roll_quat = glm::angleAxis(glm::radians(angle), camera_front);
+		orientation = orientation * roll_quat;
+		update_camera_vectors();
 	}
 
 	/// <summary>
@@ -244,6 +171,16 @@ public:
 		view = glm::lookAt(camera_position, camera_position + camera_front, camera_up);
 		glBindBuffer(GL_UNIFORM_BUFFER, Camera_UBO);
 		glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(glm::mat4), glm::value_ptr(projection * view));
+	}
+
+	//TODO:fix param
+	void look_at(glm::vec3 target)
+	{
+		glm::vec3 direction = glm::normalize(target - camera_position);
+
+		orientation = glm::quatLookAt(direction, world_up);
+
+		update_camera_vectors();
 	}
 };
 

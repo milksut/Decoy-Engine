@@ -18,7 +18,7 @@ public:
     Direction direction = Direction::LEFT_TO_RIGHT;
 
     Bar(glm::vec2 pos, glm::vec2 size, Shader* shader)
-        : Widget(pos, size), m_shader(shader)
+        : Widget(pos, size), basic_shader(shader)
     {
     }
 
@@ -62,7 +62,7 @@ public:
         glEnable(GL_BLEND);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
-        draw_quad(m_shader, background_color);
+        draw_quad(basic_shader, background_color);
 
         float ratio = get_ratio();
         if (ratio > 0.0f)
@@ -82,7 +82,7 @@ public:
             case Direction::TOP_TO_BOTTOM:  fh = h * ratio; break;
             }
 
-            draw_quad_raw(m_shader, fill_color, fx, fy, fw, fh);
+            draw_quad_raw(basic_shader, fill_color, fx, fy, fw, fh);
         }
 
         if (border_thickness > 0.0f)
@@ -93,17 +93,17 @@ public:
             float h = size.y;
             float t = border_thickness;
 
-            draw_quad_raw(m_shader, border_color, x, y, t, h);
-            draw_quad_raw(m_shader, border_color, x + w - t, y, t, h);
-            draw_quad_raw(m_shader, border_color, x, y, w, t);
-            draw_quad_raw(m_shader, border_color, x, y + h - t, w, t);
+            draw_quad_raw(basic_shader, border_color, x, y, t, h);
+            draw_quad_raw(basic_shader, border_color, x + w - t, y, t, h);
+            draw_quad_raw(basic_shader, border_color, x, y, w, t);
+            draw_quad_raw(basic_shader, border_color, x, y + h - t, w, t);
         }
 
         glEnable(GL_DEPTH_TEST);
     }
 
 private:
-    Shader* m_shader;
+    Shader* basic_shader;
 
     void draw_quad_raw(Shader* shader, const glm::vec4& color,
         float x, float y, float w, float h)

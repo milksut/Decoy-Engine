@@ -38,11 +38,36 @@ public:
 	};
 
 private:
-	static inline std::map<std::string, std::shared_ptr<Bone>> bone_map;
-	
+	std::map<std::string, std::shared_ptr<Bone>> bone_map;
+
+	Bone* root_bone = nullptr;
+	glm::vec3 last_root_pos = glm::vec3(0.0f);
+	glm::vec3 pending_root_delta = glm::vec3(0.0f);
+
 public:
 
-	static Bone* get_bone_by_name(const std::string& name)
+	bool root_motion_enabled = false;
+
+	void set_root_bone(const std::string& name)
+	{
+		root_bone = get_bone_by_name(name);
+		if (root_bone)
+		{
+			last_root_pos = root_bone->get_transform_copy().position;
+		}
+	}
+
+	glm::vec3 consume_root_motion_delta()
+	{
+		if (!root_motion_enabled || root_bone == nullptr)
+			return glm::vec3(0.0f);
+
+		glm::vec3 delta = pending_root_delta;
+		pending_root_delta = glm::vec3(0.0f);
+		return delta;
+	}
+
+	Bone* get_bone_by_name(const std::string& name)
 	{
 		auto it = bone_map.find(name);
 		if (it != bone_map.end())
@@ -64,10 +89,16 @@ public:
 		// Only create a Bone for nodes that are actual skeleton bones
 		if (model.Bone_info_map.count(name))
 		{
-			auto b = std::make_shared<Bone>(model.Bone_info_map[name].id, name, model.Bone_info_map[name].offset, parent);
+			auto b = std::make_shared<Bone>(model.Bone_info_map[name].id, name + "_" + std::to_string(reinterpret_cast<uintptr_t>(this)),
+				model.Bone_info_map[name].offset, parent);
 			current = b.get();
 			bone_map[name] = b;
+			
+			if (parent == nullptr)
+				set_root_bone(name);
 		}
+
+		
 
 		for (unsigned int i = 0; i < node->mNumChildren; i++)
 			Extract_bones_with_hierarchy( model, current, node->mChildren[i]);
@@ -118,10 +149,9 @@ public:
 			if (!scales.empty())    animation_length = std::max(animation_length, scales.rbegin()->first);
 		}
 
-		Bone_animation(const std::string& name, const aiNodeAnim* channel)
+		Bone_animation(Bone* effected_bone, const aiNodeAnim* channel)
+			: bone(effected_bone)
 		{
-			bone = Animation_manager::get_bone_by_name(name);
-			if (!bone) return;
 
 			this_object = animation_registry.create();
 
@@ -190,7 +220,6 @@ private:
 	std::vector<std::unique_ptr<Bone_animation>> bone_animations;
 public:
 
-
 	struct Bone_animation_entry
 	{
 	public:
@@ -221,11 +250,16 @@ public:
 			animation_length = std::max(animation_length, entry.start_time + entry.animation->animation_length);
 		}
 
-		void update(double delta_seconds, bool loop_clip = true)
+		bool update(double delta_seconds, bool loop_clip = true)
 		{
+			bool did_loop = false;
 			current_time += delta_seconds;
 			if (loop_clip && animation_length > 0.0)
+			{
+				if (current_time >= animation_length)
+					did_loop = true;
 				current_time = std::fmod(current_time, animation_length);
+			}
 			else
 				current_time = std::min(current_time, animation_length);
 
@@ -234,6 +268,8 @@ public:
 			auto end = animations.upper_bound(current_time);
 			for (auto it = animations.begin(); it != end; ++it)
 				evaluate(it->second);
+
+			return did_loop;
 		}
 
 	private:
@@ -292,7 +328,7 @@ public:
 	std::vector<std::string> active_animations;
 
 	//TODO: extrall al animation, not the first one
-	void Extract_skeletal_animations()
+	void Extract_skeletal_animations(std::string name = "")
 	{
 
 		if (current_model->last_scene_pointer->mNumAnimations > 0)
@@ -322,7 +358,7 @@ public:
 					continue;
 
 				// Bone_animation's second constructor does the aiNodeAnim parsing for you
-				auto bone_anim = std::make_unique<Bone_animation>(bone_name, channel);
+				auto bone_anim = std::make_unique<Bone_animation>(found, channel);
 
 				clip->add_animation(bone_anim.get(), 0.0, 1.0, true); // start=0, speed=1, loop=true
 
@@ -331,7 +367,68 @@ public:
 
 			}
 
-			std::string clip_name = anim->mName.C_Str();
+			std::string clip_name = name.empty() ? anim->mName.C_Str() : name;
+			if (clip_name.empty()) clip_name = "clip_0";
+
+			skeletal_animations[clip_name] = std::move(clip);
+			active_animations.push_back(clip_name);
+
+			LOG_INFO("Loaded animation: %s", clip_name.c_str());
+		}
+		else
+		{
+			LOG_WARNING("No animations found in model!");
+		}
+
+	}
+
+
+	//TODO:add param
+	void Add_skeletal_animation_from_file(std::string path, std::string name = "", bool flip_uvs = false)
+	{
+		Assimp::Importer scene_importer;
+
+		const aiScene* scene = scene_importer.ReadFile(path, aiProcess_Triangulate
+			| (flip_uvs ? aiProcess_FlipUVs : 0u) | aiProcess_CalcTangentSpace);
+
+
+		if (scene->mNumAnimations > 0)
+		{
+			const aiAnimation* anim = scene->mAnimations[0];
+
+			// Create a skeletal animation clip and add it to the manager
+			auto clip = std::make_unique<Skeletal_animation>();
+
+			for (unsigned int i = 0; i < anim->mNumChannels; i++)
+			{
+				const aiNodeAnim* channel = anim->mChannels[i];
+				std::string bone_name = channel->mNodeName.C_Str();
+
+				// inside the for loop over anim->mNumChannels, before the `if (get_bone_by_name(bone_name) == nullptr) continue;`
+				LOG_INFO("Animation channel[%u] name='%s' (checking bone map)...", i, bone_name.c_str());
+				auto* found = get_bone_by_name(bone_name);
+				if (!found) {
+					LOG_WARNING("  Channel '%s' has no matching bone in Bone_info_map", bone_name.c_str());
+				}
+				else {
+					LOG_DEBUG("  Channel '%s' -> bone id=%d", bone_name.c_str(), found->bone_id);
+				}
+
+				// Only process channels that map to actual bones we extracted
+				if (get_bone_by_name(bone_name) == nullptr)
+					continue;
+
+				// Bone_animation's second constructor does the aiNodeAnim parsing for you
+				auto bone_anim = std::make_unique<Bone_animation>(found, channel);
+
+				clip->add_animation(bone_anim.get(), 0.0, 1.0, true); // start=0, speed=1, loop=true
+
+				// Store it so it doesn't get destroyed
+				bone_animations.push_back(std::move(bone_anim));
+
+			}
+
+			std::string clip_name = name.empty() ? anim->mName.C_Str() : name;
 			if (clip_name.empty()) clip_name = "clip_0";
 
 			skeletal_animations[clip_name] = std::move(clip);
@@ -349,12 +446,32 @@ public:
 	//TODO: make registery tick seperatet from this tick so it didnt get called every time this one called and onlly caled 1 per game tick
 	void Tick(double delta_seconds, bool loop_clip = true)
 	{
+
+		bool any_looped = false;
 		for (const std::string& name : active_animations)
-			skeletal_animations[name]->update(delta_seconds, loop_clip);
+			if (skeletal_animations[name]->update(delta_seconds, loop_clip))  // now returns bool
+				any_looped = true;
 
-		Tick_animation_registry();
+		// Root motion: read the keyframe position BEFORE zeroing,
+		// accumulate delta, then zero BEFORE hierarchy propagation.
+		if (root_motion_enabled && root_bone)
+		{
+			glm::vec3 current_pos = root_bone->get_transform_copy().position;  // raw keyframe value
 
-		upload_bone_transforms();
+			if (!any_looped)
+				pending_root_delta += current_pos - last_root_pos;
+			// On loop: skip accumulation — avoids the backward teleport jump
+
+			last_root_pos = current_pos;  // track keyframe value for next frame's delta
+
+			// Zero XZ so the mesh stays at the physics body's origin
+			glm::vec3 zeroed = current_pos;
+			zeroed.x = 0.0f;
+			zeroed.z = 0.0f;
+			root_bone->set_position(zeroed);
+		}
+
+		Tick_animation_registry();   // propagates hierarchy WITH the zeroed root
 
 	}
 
@@ -392,4 +509,55 @@ public:
 		}
 	}
 
+	//TODO: ai code - reformat
+	void PlayAnimation(const std::string& name, bool loop = true, double speed = 1.0)
+	{
+		auto it = skeletal_animations.find(name);
+		if (it == skeletal_animations.end())
+		{
+			LOG_WARNING("Animation_manager::PlayAnimation - clip '%s' not found", name.c_str());
+			return;
+		}
+
+		// If already playing exactly this clip, just update speed/loop and return
+		if (!active_animations.empty() && active_animations[0] == name)
+		{
+			return;
+		}
+
+		// Replace active animations with this single clip
+		active_animations.clear();
+		active_animations.push_back(name);
+
+		// Reset clip time so it starts from beginning
+		it->second->current_time = 0.0;
+		it->second->animation_length = it->second->animation_length; // no-op but keeps semantics
+
+		if (root_bone)
+			last_root_pos = root_bone->get_transform_copy().position;
+
+		pending_root_delta = glm::vec3(0.0f);
+	}
+
+	void StopAnimation(const std::string& name)
+	{
+		active_animations.erase(std::remove(active_animations.begin(), active_animations.end(), name),
+			active_animations.end());
+	}
+
+	bool IsPlaying(const std::string& name) const
+	{
+		return !active_animations.empty() && active_animations[0] == name;
+	}
+
+	bool IsFinished(const std::string& name) const
+	{
+		if (!IsPlaying(name)) 
+			return false;
+
+		auto it = skeletal_animations.find(name);
+		if (it == skeletal_animations.end())
+			return false;
+		return it->second->current_time >= it->second->animation_length;
+	}
 };

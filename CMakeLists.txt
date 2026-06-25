@@ -113,6 +113,7 @@ FetchContent_Declare(
 )
 set(JOLT_BUILD_TESTS OFF CACHE BOOL "" FORCE)
 set(JOLT_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+set(JPH_DEBUG_RENDERER ON CACHE BOOL "" FORCE)
 FetchContent_MakeAvailable(JoltPhysics)
 
 # --- OpenAL Soft ---
@@ -135,7 +136,7 @@ FetchContent_MakeAvailable(openal)
 add_executable(${PROJECT_NAME} 
     "model_loading_test.cpp"
     "stb_setup.cpp"
-)
+ "Layers/gurard_lyer.h")
 
 # -------------------------------------------------------------------
 # 4. LINKING & INCLUDES

@@ -53,6 +53,11 @@ public:
 		return registry.try_get<Component_type>(this_object);
 	}
 
+	//?: maybe make it a function pointer so it can take values or return things?
+	//TODO: add param
+	///works after all transforms ticked and before they are uploaded
+	virtual void user_function_per_tick() {};
+
 	/// <summary>
 	///     Updates all root transforms and uploads final transformation data.
 	/// </summary>
@@ -70,6 +75,12 @@ public:
 			Global_object_map::get_object(id_comp.id)->tick_transforms(glm::mat4(1.0f));
 		});
 
+		auto all_view = registry_in.view<Id_component>();
+		all_view.each([](auto, Id_component& id_comp)
+		{
+			Global_object_map::get_object(id_comp.id)->user_function_per_tick();
+		});
+
 		upload_all_transforms();
 
 	}
@@ -82,6 +93,16 @@ public:
 	{
 		return id_counter;
 	}
+
+	//TODO: add param
+	entt::entity get_entity() const
+	{
+		return this_object;
+	}
+
+	virtual glm::vec3 get_position_world() const = 0;
+
+	virtual glm::quat get_rotation_quat() const = 0;
 
 protected:
 
@@ -135,6 +156,8 @@ protected:
 	{
 		return id_counter++;
 	}
+
+
 
 	game_object_base(entt::registry& registry_in)
 		: registry(registry_in) {}
@@ -533,7 +556,7 @@ protected:
 	/// <param name="parent_object">[in] Optional parent object for hierarchy.</param>
 	/// <param name="special_region">[in] Optional custom region override for the object.</param>
 	/// <param name="transform">[in] Initial transform component.</param>
-	game_object_basic(entt::registry& registry_in, const std::string& tag = "Undefined tag", game_object_basic* parent_object = nullptr,
+	game_object_basic(entt::registry& registry_in, const std::string& tag = "Undefined tag", game_object_base* parent_object = nullptr,
 		std::shared_ptr<class_region> special_region = nullptr, Transform_component transform = Transform_component())
 		: game_object_base(registry_in), special_region(special_region)
 	{
@@ -552,7 +575,7 @@ protected:
 		if (parent_object != nullptr)
 		{
 			registry.emplace<Parent_component>(this_object, parent_object->get_id());
-			registry.get_or_emplace<Child_component>(parent_object->this_object).children_ids.push_back(id);
+			registry.get_or_emplace<Child_component>(parent_object->get_entity()).children_ids.push_back(id);
 		}
 
 		try_assign_region_slot();
@@ -890,9 +913,15 @@ public:
 	///     Returns the object's current position.
 	/// </summary>
 	/// <returns>World position vector.</returns>
-	glm::vec3 get_position() const
+	glm::vec3 get_position_local() const
 	{
 		return get_transform_ref().position;
+	}
+
+	//TODO:add param
+	glm::vec3 get_position_world()const override
+	{
+		return glm::vec3(get_transform_copy().world[3]);
 	}
 
 	/// <summary>
@@ -917,7 +946,7 @@ public:
 	///     Returns the object's rotation as a quaternion.
 	/// </summary>
 	/// <returns>Current rotation quaternion.</returns>
-	glm::quat get_rotation_quat() const
+	glm::quat get_rotation_quat() const override
 	{
 		return get_transform_ref().rotation_quat;
 	}
@@ -929,6 +958,33 @@ public:
 	bool get_is_using_quat() const
 	{
 		return get_transform_ref().use_quat;
+	}
+
+
+	//TODO:add param
+	glm::vec3 get_right_vector() const
+	{
+		const glm::mat4& world_mat = get_transform_copy().world;
+
+		return glm::normalize(glm::vec3(world_mat[0]));
+	}
+
+	//TODO:add param
+	glm::vec3 get_up_vector() const
+	{
+		const glm::mat4& world_mat = get_transform_copy().world;
+
+		return glm::normalize(glm::vec3(world_mat[1]));
+	}
+	
+	//TODO:add param
+	glm::vec3 get_front_vector() const
+	{
+		const glm::mat4& world_mat = get_transform_copy().world;
+
+		glm::vec3 forward = glm::vec3(world_mat[2]);
+
+		return glm::normalize(forward);
 	}
 
 	//--- upload/change model--------------------------------------------------------------------

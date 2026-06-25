@@ -334,14 +334,20 @@ public:
     /// <param name="event">[in] Event to be dispatched.</param>
     void throw_event(const std::string& channel_name, std::unique_ptr<Event_management::Event> event)
     {
-        std::lock_guard<std::mutex> lock(channels_mutex);
-        const auto it = channels.find(channel_name);
-        if (it == channels.end())
+        std::shared_ptr<Channel> channel_ptr;
         {
-            LOG_ERROR("The_event_manager - throw_event failed, channel '%s' not found!", channel_name.c_str());
-            return;
+            std::lock_guard<std::mutex> lock(channels_mutex);
+            const auto it = channels.find(channel_name);
+            if (it == channels.end())
+            {
+                LOG_ERROR("The_event_manager - throw_event failed, channel '%s' not found!", channel_name.c_str());
+                return;
+            }
+            channel_ptr = it->second; // copy shared_ptr while holding lock
         }
-        it->second->throw_event(std::move(event));
+
+        // Call into the channel without holding channels_mutex
+        channel_ptr->throw_event(std::move(event));
     }
 
     /// <summary>

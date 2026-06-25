@@ -1,6 +1,4 @@
 #version 330 core
-#define MAX_BONES 100
-#define MAX_BONES_PER_VERTEX 4
 
 layout (location = 0) in vec3 aPos;
 layout (location = 1) in vec2 aTexCoord;
@@ -35,5 +33,4 @@ void main()
 	vec4 worldPos = model * vec4(aPos, 1.0);
 	FragPos = vec3(worldPos);
 	gl_Position = projectionXview * worldPos;
-	
 }
