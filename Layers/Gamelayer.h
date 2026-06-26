@@ -390,7 +390,7 @@ private:
 
         // Man
         m_man_model = std::make_unique<game_object_basic_model>();
-        m_man_model->import_model_from_file("C:\\Users\\altay\\Desktop\\data\\Wave Hip Hop Dance.fbx", false);
+        m_man_model->import_model_from_file("Models\\Imported\\Wave Hip Hop Dance.fbx", false);
         m_man_model->add_instance_buffer(16, MODEL_ATRIB_LAST_INDEX + 1);
         m_man_model->add_instance_buffer(9, MODEL_ATRIB_LAST_INDEX + 5);
 

@@ -374,7 +374,7 @@ private:
     void setup_models()
     {
         // Player
-        character_model.import_model_from_file("C:\\Users\\altay\\Desktop\\data\\my_game_data\\Wave Hip Hop Dance.fbx", false);
+        character_model.import_model_from_file("Models\\Imported\\Wave Hip Hop Dance.fbx", false);
         character_model.add_instance_buffer(16, MODEL_ATRIB_LAST_INDEX + 1);
         character_model.add_instance_buffer(9, MODEL_ATRIB_LAST_INDEX + 5);
 
@@ -387,7 +387,7 @@ private:
         wrapper = new camera_wrapper(global_registry, "camera_wrapper", player, camera);
 
         //Enemy
-        enemy_model.import_model_from_file("C:\\Users\\altay\\Desktop\\data\\my_game_data\\Bouncing Fight Idle.fbx", false);
+        enemy_model.import_model_from_file("Models\\Imported\\Bouncing Fight Idle.fbx", false);
         enemy_model.add_instance_buffer(16, MODEL_ATRIB_LAST_INDEX + 1);
         enemy_model.add_instance_buffer(9, MODEL_ATRIB_LAST_INDEX + 5);
 
@@ -408,15 +408,15 @@ private:
         enemy_anim_mng->Extract_skeletal_animations("idle");
 
 
-        player_anim_mng->Add_skeletal_animation_from_file("C:\\Users\\altay\\Desktop\\data\\my_game_data\\Idle.fbx", "Idle");
-        player_anim_mng->Add_skeletal_animation_from_file("C:\\Users\\altay\\Desktop\\data\\my_game_data\\Slow Run.fbx", "Slow Run");
-        player_anim_mng->Add_skeletal_animation_from_file("C:\\Users\\altay\\Desktop\\data\\my_game_data\\Standing Run Left.fbx", "Standing Run Left");
-        player_anim_mng->Add_skeletal_animation_from_file("C:\\Users\\altay\\Desktop\\data\\my_game_data\\Standing Run Right.fbx", "Standing Run Right");
-        player_anim_mng->Add_skeletal_animation_from_file("C:\\Users\\altay\\Desktop\\data\\my_game_data\\Jumping.fbx", "Jumping");
-        player_anim_mng->Add_skeletal_animation_from_file("C:\\Users\\altay\\Desktop\\data\\my_game_data\\Running Backward.fbx", "Running Backward");
-        player_anim_mng->Add_skeletal_animation_from_file("C:\\Users\\altay\\Desktop\\data\\my_game_data\\Fast Run.fbx", "Fast Run");
+        player_anim_mng->Add_skeletal_animation_from_file("Models\\Imported\\Idle.fbx", "Idle");
+        player_anim_mng->Add_skeletal_animation_from_file("Models\\Imported\\Slow Run.fbx", "Slow Run");
+        player_anim_mng->Add_skeletal_animation_from_file("Models\\Imported\\Standing Run Left.fbx", "Standing Run Left");
+        player_anim_mng->Add_skeletal_animation_from_file("Models\\Imported\\Standing Run Right.fbx", "Standing Run Right");
+        player_anim_mng->Add_skeletal_animation_from_file("Models\\Imported\\Jumping.fbx", "Jumping");
+        player_anim_mng->Add_skeletal_animation_from_file("Models\\Imported\\Running Backward.fbx", "Running Backward");
+        player_anim_mng->Add_skeletal_animation_from_file("Models\\Imported\\Fast Run.fbx", "Fast Run");
 
-        player_anim_mng->Add_skeletal_animation_from_file("C:\\Users\\altay\\Desktop\\data\\my_game_data\\Standing Melee Punch.fbx", "Standing Melee Punch");
+        player_anim_mng->Add_skeletal_animation_from_file("Models\\Imported\\Standing Melee Punch.fbx", "Standing Melee Punch");
 
         player_anim_mng->root_motion_enabled = true;
     }

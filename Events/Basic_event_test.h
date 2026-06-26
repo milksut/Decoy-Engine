@@ -1,6 +1,3 @@
-//
-// Created by altay2510tr on 3/11/26.
-//
 #pragma once
 #include "Globals.h"
 
