@@ -212,8 +212,6 @@ public:
             if(event->timing == Event_management::Event_timing::Immediate)
             {
                 immediate_event = std::move(event);
-                lock.unlock();//need to unlock so thread can lock it and work
-
                 signal.notify_one();
             }
             else

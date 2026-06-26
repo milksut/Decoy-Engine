@@ -106,7 +106,7 @@ public:
 		int char_per_row = width / char_width;
 		int char_per_col = height / char_height;
 
-		char_pos.reserve(char_per_row * char_per_col);
+		char_pos.reserve((size_t)char_per_row * (size_t)char_per_col);
 
 		std::ifstream file(char_set_path); // Open the file
 		if (!file.is_open())
@@ -145,7 +145,14 @@ public:
 	/// </summary>
 	~TextRenderer()
 	{
-		Texture_slots::delete_texture(texture_atlas.id);
+		try
+		{
+			Texture_slots::delete_texture(texture_atlas.id);
+		}
+		catch (const std::exception& e)
+		{
+			LOG_ERROR("TextRenderer destructor - failed to delete texture: %s", e.what());
+		}
 	}
 
 	/// <summary>

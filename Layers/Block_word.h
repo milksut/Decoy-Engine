@@ -7,8 +7,6 @@
 #include <Jolt/Physics/Collision/RayCast.h>
 #include <Jolt/Physics/Collision/CastResult.h>
 
-// Her layer ile carpisan basit filter siniflar
-// (Bu Jolt versiyonunda BroadPhaseLayerFilterAll / ObjectLayerFilterAll yok)
 class AllBroadPhaseFilter : public JPH::BroadPhaseLayerFilter
 {
 public:
@@ -35,7 +33,6 @@ struct IVec3Hash
     }
 };
 
-// BodyID icin hash
 struct BodyIDHash
 {
     size_t operator()(const JPH::BodyID& id) const
@@ -72,8 +69,6 @@ public:
 private:
     std::unordered_map<glm::ivec3, BlockEntry, IVec3Hash>         m_blocks;
 
-    // Ters harita: Jolt BodyID -> grid pozisyonu
-    // Bu sayede raycast'te hit.mBodyID'den direkt blok pozisyonu bulunabilir
     std::unordered_map<JPH::BodyID, glm::ivec3, BodyIDHash, BodyIDEqual> m_body_to_grid;
 
     Physics_manager* m_physics = nullptr;
@@ -129,7 +124,6 @@ public:
 
             entry.body_id = bi->CreateAndAddBody(body_settings, JPH::EActivation::DontActivate);
 
-            // Ters haritaya kaydet
             if (!entry.body_id.IsInvalid())
                 m_body_to_grid[entry.body_id] = pos;
         }
@@ -143,7 +137,6 @@ public:
         auto it = m_blocks.find(pos);
         if (it == m_blocks.end()) return false;
 
-        // Ters haritadan temizle
         if (!it->second.body_id.IsInvalid())
         {
             m_body_to_grid.erase(it->second.body_id);
@@ -174,11 +167,7 @@ public:
         glm::ivec3 normal;
     };
 
-    // -------------------------------------------------------------------
-    // Raycast � Jolt'tan gelen BodyID ile ters haritadan blok bulunur.
-    // Normal hesab�: �arpma noktas� ile blok merkezi aras�ndaki fark�n
-    // dominant ekseni kullan�l�r; ama �nce y�zey epsilon'u uygulan�r.
-    // -------------------------------------------------------------------
+
     std::optional<RayHit> raycast(const glm::vec3& origin, const glm::vec3& dir, float max_dist = 10.0f, JPH::BodyID skip_body_id = JPH::BodyID())
     {
         if (!m_physics) return std::nullopt;
@@ -193,12 +182,10 @@ public:
         AllBroadPhaseFilter bp_filter;
         AllObjectLayerFilter ol_filter;
 
-        // Tum hit'leri topla (en yakin once sirali)
         std::vector<JPH::RayCastResult> hits;
         if (!m_physics->cast_ray_all(ray, hits, bp_filter, ol_filter))
             return std::nullopt;
 
-        // skip_body_id'yi atla, ilk blok body'sini bul
         JPH::RayCastResult best;
         best.mBodyID = JPH::BodyID();
         for (auto& h : hits)
@@ -217,7 +204,6 @@ public:
 
         glm::ivec3 block_pos = m_body_to_grid.at(best.mBodyID);
 
-        // Normal: carpma noktasi ile blok merkezinin dominant ekseni
         JPH::RVec3 jolt_hit = ray.GetPointOnRay(best.mFraction);
         glm::vec3  hp(jolt_hit.GetX(), jolt_hit.GetY(), jolt_hit.GetZ());
         glm::vec3  center = grid_to_world(block_pos);

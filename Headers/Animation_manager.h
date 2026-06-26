@@ -327,58 +327,11 @@ public:
 	std::map<std::string, std::unique_ptr<Skeletal_animation>> skeletal_animations;
 	std::vector<std::string> active_animations;
 
-	//TODO: extrall al animation, not the first one
+	
 	void Extract_skeletal_animations(std::string name = "")
 	{
 
-		if (current_model->last_scene_pointer->mNumAnimations > 0)
-		{
-			const aiAnimation* anim = current_model->last_scene_pointer->mAnimations[0];
-
-			// Create a skeletal animation clip and add it to the manager
-			auto clip = std::make_unique<Skeletal_animation>();
-
-			for (unsigned int i = 0; i < anim->mNumChannels; i++)
-			{
-				const aiNodeAnim* channel = anim->mChannels[i];
-				std::string bone_name = channel->mNodeName.C_Str();
-
-				// inside the for loop over anim->mNumChannels, before the `if (get_bone_by_name(bone_name) == nullptr) continue;`
-				LOG_INFO("Animation channel[%u] name='%s' (checking bone map)...", i, bone_name.c_str());
-				auto* found = get_bone_by_name(bone_name);
-				if (!found) {
-					LOG_WARNING("  Channel '%s' has no matching bone in Bone_info_map", bone_name.c_str());
-				}
-				else {
-					LOG_DEBUG("  Channel '%s' -> bone id=%d", bone_name.c_str(), found->bone_id);
-				}
-
-				// Only process channels that map to actual bones we extracted
-				if (get_bone_by_name(bone_name) == nullptr)
-					continue;
-
-				// Bone_animation's second constructor does the aiNodeAnim parsing for you
-				auto bone_anim = std::make_unique<Bone_animation>(found, channel);
-
-				clip->add_animation(bone_anim.get(), 0.0, 1.0, true); // start=0, speed=1, loop=true
-
-				// Store it so it doesn't get destroyed
-				bone_animations.push_back(std::move(bone_anim));
-
-			}
-
-			std::string clip_name = name.empty() ? anim->mName.C_Str() : name;
-			if (clip_name.empty()) clip_name = "clip_0";
-
-			skeletal_animations[clip_name] = std::move(clip);
-			active_animations.push_back(clip_name);
-
-			LOG_INFO("Loaded animation: %s", clip_name.c_str());
-		}
-		else
-		{
-			LOG_WARNING("No animations found in model!");
-		}
+		extract_animation(current_model->last_scene_pointer, name);
 
 	}
 
@@ -392,9 +345,17 @@ public:
 			| (flip_uvs ? aiProcess_FlipUVs : 0u) | aiProcess_CalcTangentSpace);
 
 
-		if (scene->mNumAnimations > 0)
+		extract_animation(scene, name);
+
+	}
+private:
+	//to avoid duplication
+	//TODO: extrall al animation, not the first one
+	void extract_animation(const aiScene* scene_pointer, std::string name = "")
+	{
+		if (scene_pointer->mNumAnimations > 0)
 		{
-			const aiAnimation* anim = scene->mAnimations[0];
+			const aiAnimation* anim = scene_pointer->mAnimations[0];
 
 			// Create a skeletal animation clip and add it to the manager
 			auto clip = std::make_unique<Skeletal_animation>();
@@ -440,8 +401,8 @@ public:
 		{
 			LOG_WARNING("No animations found in model!");
 		}
-
 	}
+public:
 
 	//TODO: make registery tick seperatet from this tick so it didnt get called every time this one called and onlly caled 1 per game tick
 	void Tick(double delta_seconds, bool loop_clip = true)

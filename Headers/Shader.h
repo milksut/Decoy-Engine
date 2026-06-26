@@ -76,7 +76,7 @@ public:
         GLuint blockIndex = glGetUniformBlockIndex(ID, "Material_block");
         if(blockIndex == GL_INVALID_INDEX)
         {
-            LOG_INFO("Shader with id: %d dont have a Material block, skipping material UBO Binding");
+            LOG_INFO("Shader with id: %d dont have a Material block, skipping material UBO Binding", ID);
 		}
         else
         {
